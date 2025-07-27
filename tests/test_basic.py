@@ -26,5 +26,12 @@ class TestHelpers(unittest.TestCase):
         finally:
             tmp.unlink()
 
+    def test_patch_torchvision(self):
+        from lynx.compat import patch_torchvision
+        import sys
+        sys.modules.pop('torchvision.transforms.functional_tensor', None)
+        patch_torchvision()
+        self.assertIn('torchvision.transforms.functional_tensor', sys.modules)
+
 if __name__ == '__main__':
     unittest.main()

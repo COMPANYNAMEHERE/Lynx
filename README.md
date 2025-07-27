@@ -34,3 +34,9 @@ Run the bundled unit tests to verify basic functionality:
 ```bash
 python tester.py
 ```
+
+## Troubleshooting
+
+If you encounter `ModuleNotFoundError: torchvision.transforms.functional_tensor`,
+the package includes a shim that loads automatically. Ensure you import
+``lynx`` before using Real-ESRGAN modules so the patch can take effect.

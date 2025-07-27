@@ -146,8 +146,11 @@ Each agent reports via:
 
 ## Common Errors & Fixes
 
-- **`ModuleNotFoundError: torchvision.transforms.functional_tensor`**  
-  Use the BasicSR from GitHub (already in `requirements.txt`) or add the small shim (see earlier messages).
+**`ModuleNotFoundError: torchvision.transforms.functional_tensor`**
+  Newer torchvision versions moved these helpers. Lynx ships a shim that
+  installs automatically on `import lynx`. Ensure you import the package
+  before using Real-ESRGAN, or use the BasicSR repo listed in
+  `requirements.txt`.
 
 - **`FFmpeg encode failed`**  
   Check codec support: `ffmpeg -hide_banner -encoders | findstr nvenc`. Try `h264_nvenc`, lower preset, or ensure drivers are up to date.
