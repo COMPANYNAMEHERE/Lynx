@@ -1,0 +1,8 @@
+# Core deps (PyTorch is installed separately)
+numpy>=1.24
+opencv-python>=4.9
+tqdm>=4.66
+yt-dlp>=2024.7
+realesrgan>=0.3.0
+# Use the upstream BasicSR (avoids torchvision import issues)
+basicsr @ git+https://github.com/XPixelGroup/BasicSR@master

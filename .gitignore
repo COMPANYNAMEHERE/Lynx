@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Venv & VS Code
+.venv/
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build/packaging
+build/
+dist/
+*.egg-info/
+
+# Project outputs & models
+outputs/
+work/
+weights/
+weights/**/*.pth
+logs/
+*.log
