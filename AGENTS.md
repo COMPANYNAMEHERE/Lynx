@@ -9,12 +9,31 @@ The app turns a **local file or YouTube URL** into an **upscaled 4K (or custom) 
 - FFmpeg (NVENC)
 - Local‑only storage for downloads and temp files
 
+### Project goal
+
+Provide a completely local pipeline for taking any video (file or YouTube link)
+and producing a high quality upscale using open models. The code is organised as
+small "agents" with clear IO contracts so that new features like denoising or
+interpolation can be slotted in easily. Keep contributions focused on a single
+agent when possible.
+
 ### Directory layout (local-only)
 weights/ # model files (.pth) auto-downloaded + verified
 work/
 downloads/ # yt-dlp outputs (kept)
 temp/ # transient chunks (cleaned unless --keep_temps)
 outputs/ # encoded results
+
+### Code layout
+```
+lynx/            # package with all modules
+  download.py    # yt-dlp helpers and URL checks
+  models.py      # weight fetching and verification
+  encode.py      # FFmpeg NVENC interface
+  upscale.py     # Real-ESRGAN helpers
+  processor.py   # pipeline controller
+  gui.py         # Tkinter UI
+```
 
 
 ---
@@ -145,8 +164,19 @@ Each agent reports via:
 
 - **Batch Agent**: read a list of URLs/files and queue jobs.  
 - **Denoise/DeBlock Agent**: optional pre‑filter via FFmpeg (`-vf pp=ac` or `nlmeans`).  
-- **Interpolation Agent**: add RIFE for motion smoothing/slow‑mo.  
+- **Interpolation Agent**: add RIFE for motion smoothing/slow‑mo.
 - **TensorRT/ONNX Agent**: export Real‑ESRGAN for extra speed.
+
+---
+
+## Contribution guidelines
+
+- Keep modules small and self contained. Each agent should expose a single
+  function or class responsible for one task.
+- Use type hints and docstrings for all public functions.
+- Ensure new features run without internet access once dependencies and weights
+  are present locally.
+- Prefer standard library or lightweight dependencies.
 
 ---
 
@@ -161,8 +191,9 @@ Each agent reports via:
 
 ## Quick Tests
 
-- **Local file**: small 10–30s 1080p clip → 4K output.  
+- **Local file**: small 10–30s 1080p clip → 4K output.
 - **YouTube**: short trailer (rights‑cleared) → verify download, SR, encode.
+- Run the unit suite with `python tester.py` to check helper functions.
 
 ---
 
