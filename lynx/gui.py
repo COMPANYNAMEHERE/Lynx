@@ -8,7 +8,63 @@ from typing import Optional
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import subprocess
 from .processor import Processor
+from .models import ensure_model
+
+
+class SplashScreen:
+    """Simple splash window with status text and progress bar."""
+
+    def __init__(self, root: tk.Tk) -> None:
+        self.top = tk.Toplevel(root)
+        self.top.title("Lynx Loading")
+        self.top.resizable(False, False)
+        self.top.geometry("360x120")
+        self.top.attributes("-topmost", True)
+        self.var_msg = tk.StringVar(value="Starting…")
+        tk.Label(self.top, textvariable=self.var_msg).pack(pady=10)
+        self.bar = ttk.Progressbar(self.top, maximum=100, length=300)
+        self.bar.pack(pady=10)
+        self.top.update()
+
+    def update(self, msg: str, value: int) -> None:
+        self.var_msg.set(msg)
+        self.bar["value"] = value
+        self.top.update_idletasks()
+
+    def close(self) -> None:
+        self.top.destroy()
+
+
+def preload(root: tk.Tk) -> None:
+    """Run basic preflight checks while showing a splash screen."""
+
+    splash = SplashScreen(root)
+
+    # 1. Check FFmpeg
+    splash.update("Checking FFmpeg…", 10)
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=True)
+    except Exception:
+        pass
+
+    # 2. Ensure models exist (download if needed)
+    weights = Path("weights")
+    for idx, model in enumerate(["RealESRGAN_x2plus.pth", "RealESRGAN_x4plus.pth"]):
+        splash.update(f"Loading {model}…", 30 + idx * 30)
+        try:
+            ensure_model(weights, model,
+                         progress_cb=lambda d, t, base=idx: splash.update(
+                             f"Loading {model}…",
+                             30 + base * 30 + int((d / (t or 1)) * 30)
+                         ))
+        except Exception:
+            continue
+
+    splash.update("Starting UI…", 100)
+    splash.close()
 
 
 class App:
@@ -198,6 +254,12 @@ class App:
 
 def main() -> None:
     root = tk.Tk()
+    root.withdraw()
+    preload(root)
+    root.deiconify()
+    root.lift()
+    root.attributes("-topmost", True)
+    root.after(0, root.attributes, "-topmost", False)
     app = App(root)
     root.minsize(720, 600)
     root.mainloop()
