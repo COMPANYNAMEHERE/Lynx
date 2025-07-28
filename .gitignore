@@ -25,3 +25,4 @@ weights/
 weights/**/*.pth
 logs/
 *.log
+.conda/
