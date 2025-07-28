@@ -8,6 +8,10 @@ from typing import Optional
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
+import logging
+from .logger import get_logger
+
+logger = get_logger()
 
 
 class Tooltip:
@@ -79,6 +83,7 @@ def preload(root: ctk.CTk) -> bool:
     Returns ``True`` if startup completed, ``False`` if cancelled.
     """
 
+    logger.info("Performing startup checks")
     cancel_event = threading.Event()
     splash = SplashScreen(root, cancel_event)
 
@@ -126,6 +131,7 @@ def preload(root: ctk.CTk) -> bool:
         return False
 
     splash.update("Starting UI…", 100)
+    logger.info("Startup checks complete")
     splash.close()
     return True
 
@@ -256,6 +262,7 @@ class App:
         self.apply_options()
 
     def log(self, msg: str) -> None:
+        logger.info(msg)
         self.txt_log.insert("end", msg + "\n")
         self.txt_log.see("end")
         self.root.update_idletasks()
@@ -410,8 +417,10 @@ class App:
             cfg = self.collect_cfg()
         except Exception as e:
             messagebox.showerror("Invalid settings", str(e))
+            logger.error("Invalid settings: %s", e)
             return
 
+        logger.info("Starting processing")
         self.btn_run.config(state="disabled")
         self.btn_cancel.config(state="normal")
         self.set_status("Starting…")
@@ -427,12 +436,14 @@ class App:
         if self.processor:
             self.processor.cancel()
             self.set_status("Cancelling…")
+            logger.info("Cancel requested")
         self.btn_cancel.config(state="disabled")
         self.btn_run.config(state="normal")
 
 
 def main() -> None:
     ctk.set_appearance_mode("Dark")
+    logger.info("Launching GUI")
     root = ctk.CTk()
     root.withdraw()
     if not preload(root):

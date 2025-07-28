@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Dict
+from .logger import get_logger
+
+logger = get_logger()
 
 OPTIONS_DIR = Path("options")
 OPTIONS_FILE = OPTIONS_DIR / "settings.json"
@@ -32,9 +35,10 @@ def load_options() -> Dict[str, Any]:
             data = json.loads(OPTIONS_FILE.read_text())
             opts = DEFAULTS.copy()
             opts.update({k: data.get(k, v) for k, v in DEFAULTS.items()})
+            logger.debug("Loaded options from %s", OPTIONS_FILE)
             return opts
         except Exception:
-            pass
+            logger.exception("Failed to load options; using defaults")
     return DEFAULTS.copy()
 
 
@@ -42,3 +46,4 @@ def save_options(opts: Dict[str, Any]) -> None:
     """Persist options to disk."""
     OPTIONS_DIR.mkdir(exist_ok=True)
     OPTIONS_FILE.write_text(json.dumps(opts, indent=2))
+    logger.debug("Saved options to %s", OPTIONS_FILE)

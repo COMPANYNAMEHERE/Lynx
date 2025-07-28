@@ -14,6 +14,9 @@ from .download import is_url, yt_download
 from .encode import run_ffmpeg_encode
 from .models import ensure_model
 from .upscale import build_upsampler, pick_model
+from .logger import get_logger
+
+logger = get_logger()
 
 
 class UIHooks:
@@ -36,6 +39,7 @@ class Processor:
 
     # Internal helpers
     def _log(self, msg: str) -> None:
+        logger.info(msg)
         self.ui.log(msg)
 
     def _set_bar(self, which: str, done: int, total: int) -> None:
@@ -43,6 +47,7 @@ class Processor:
 
     def run(self, cfg: dict) -> None:
         """Entry point for the processing thread."""
+        logger.info("Processing thread started")
         try:
             self._log("Checking FFmpeg availability…")
             subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -194,3 +199,5 @@ class Processor:
                 cancel_event=self.cancel_event,
                 log_cb=self._log,
             )
+
+        logger.info("Processing finished")
