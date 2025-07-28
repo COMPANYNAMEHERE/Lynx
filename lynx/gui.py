@@ -149,6 +149,7 @@ class App:
         root.title("Lynx Upscaler")
         self.processor: Optional[Processor] = None
         self.opts = load_options()
+        logger.debug("Options loaded: %s", self.opts)
 
         menubar = tk.Menu(root)
         opt_menu = tk.Menu(menubar, tearoff=0)
@@ -265,6 +266,7 @@ class App:
         self.btn_cancel.pack(side="left", padx=6)
 
         self.apply_options()
+        logger.debug("UI initialized")
 
     def log(self, msg: str) -> None:
         logger.info(msg)
@@ -357,6 +359,7 @@ class App:
         self.var_keep_temps.set(bool(self.opts["keep_temps"]))
         self.var_prefetch.set(bool(self.opts["prefetch_models"]))
         self.var_strict_hash.set(bool(self.opts["strict_model_hash"]))
+        logger.debug("Applied options to UI")
 
     def open_options(self) -> None:
         if getattr(self, "opt_win", None):
@@ -364,6 +367,7 @@ class App:
             return
         self.opt_win = ctk.CTkToplevel(self.root)
         self.opt_win.title("Options")
+        logger.debug("Options window opened")
         tab = ctk.CTkTabview(self.opt_win)
         tab.pack(fill="both", expand=True, padx=10, pady=10)
         paths = tab.add("Paths")
@@ -405,17 +409,20 @@ class App:
     def reset_options(self) -> None:
         for k, var in self.opt_vars.items():
             var.set(DEFAULTS[k])
+        logger.debug("Options reset to defaults")
 
     def save_options(self) -> None:
         for k, var in self.opt_vars.items():
             self.opts[k] = var.get()
         save_options(self.opts)
         self.apply_options()
+        logger.debug("Options saved")
 
     def close_options(self) -> None:
         if getattr(self, "opt_win", None):
             self.opt_win.destroy()
             self.opt_win = None
+            logger.debug("Options window closed")
 
     def start(self) -> None:
         try:
@@ -436,6 +443,7 @@ class App:
         self.processor = Processor(self)
         t = threading.Thread(target=self.processor.run, args=(cfg,), daemon=True)
         t.start()
+        logger.debug("Processing thread launched")
 
     def cancel(self) -> None:
         if self.processor:
@@ -444,6 +452,7 @@ class App:
             logger.info("Cancel requested")
         self.btn_cancel.config(state="disabled")
         self.btn_run.config(state="normal")
+        logger.debug("Cancel handler completed")
 
 
 def main() -> None:
@@ -452,11 +461,26 @@ def main() -> None:
     root = ctk.CTk()
     root.withdraw()
 
+    orig_destroy = root.destroy
+    orig_quit = root.quit
+
     def report_callback_exception(exc: type[BaseException], val: BaseException, tb: object) -> None:
         logger.exception("Tkinter callback error", exc_info=(exc, val, tb))
         messagebox.showerror("Error", f"{exc.__name__}: {val}")
 
+    def logged_destroy(*args: object, **kwargs: object) -> None:
+        logger.debug("root.destroy called", stack_info=True)
+        return orig_destroy(*args, **kwargs)
+
+    def logged_quit(*args: object, **kwargs: object) -> None:
+        logger.debug("root.quit called", stack_info=True)
+        return orig_quit(*args, **kwargs)
+
+    root.bind("<Destroy>", lambda e: logger.debug("<Destroy> event for %s", e.widget))
+
     root.report_callback_exception = report_callback_exception  # type: ignore[attr-defined]
+    root.destroy = logged_destroy  # type: ignore[assignment]
+    root.quit = logged_quit  # type: ignore[assignment]
 
     if not preload(root):
         logger.info("Startup cancelled")
@@ -467,7 +491,12 @@ def main() -> None:
     root.lift()
     root.attributes("-topmost", True)
     root.after(0, root.attributes, "-topmost", False)
-    root.protocol("WM_DELETE_WINDOW", root.destroy)
+
+    def on_close() -> None:
+        logger.info("Window close requested")
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
     app = App(root)
     root.minsize(720, 600)
     logger.info("Entering mainloop")
