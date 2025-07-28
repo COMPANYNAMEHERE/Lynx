@@ -451,16 +451,30 @@ def main() -> None:
     logger.info("Launching GUI")
     root = ctk.CTk()
     root.withdraw()
+
+    def report_callback_exception(exc: type[BaseException], val: BaseException, tb: object) -> None:
+        logger.exception("Tkinter callback error", exc_info=(exc, val, tb))
+        messagebox.showerror("Error", f"{exc.__name__}: {val}")
+
+    root.report_callback_exception = report_callback_exception  # type: ignore[attr-defined]
+
     if not preload(root):
+        logger.info("Startup cancelled")
         root.destroy()
         return
+
     root.deiconify()
     root.lift()
     root.attributes("-topmost", True)
     root.after(0, root.attributes, "-topmost", False)
+    root.protocol("WM_DELETE_WINDOW", root.destroy)
     app = App(root)
     root.minsize(720, 600)
-    root.mainloop()
+    logger.info("Entering mainloop")
+    try:
+        root.mainloop()
+    finally:
+        logger.info("GUI closed")
 
 
 if __name__ == "__main__":
