@@ -7,7 +7,13 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-import cv2
+try:
+    import cv2  # type: ignore
+except Exception as e:  # pragma: no cover - allow starting GUI without cv2
+    cv2 = None  # type: ignore
+    CV2_IMPORT_ERROR = e
+else:
+    CV2_IMPORT_ERROR = None
 import torch
 
 from .download import is_url, yt_download
@@ -48,6 +54,10 @@ class Processor:
     def run(self, cfg: dict) -> None:
         """Entry point for the processing thread."""
         logger.info("Processing thread started")
+        if cv2 is None:
+            raise RuntimeError(
+                f"OpenCV is unavailable: {CV2_IMPORT_ERROR}. Please install opencv-python"
+            )
         try:
             self._log("Checking FFmpeg availability…")
             subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)

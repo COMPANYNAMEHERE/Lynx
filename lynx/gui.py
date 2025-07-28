@@ -5,7 +5,12 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-import customtkinter as ctk
+try:
+    import customtkinter as ctk
+except Exception as e:  # pragma: no cover - import failure check
+    raise RuntimeError(
+        "customtkinter is required for the GUI. Install it with 'pip install customtkinter'."
+    ) from e
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import logging
