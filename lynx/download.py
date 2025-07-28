@@ -45,6 +45,7 @@ def yt_download(
     if log_cb:
         log_cb("Downloading YouTube source…")
 
+    # yt-dlp expects flat lists for postprocessor_args; avoid nested lists
     ydl_opts = {
         "paths": {"home": str(downloads_dir)},
         "outtmpl": "%(title).200B [%(id)s].%(ext)s",
@@ -55,7 +56,7 @@ def yt_download(
         "no_warnings": True,
         "cachedir": False,
         "concurrent_fragment_downloads": 8,
-        "postprocessor_args": [["-nostdin"]],
+        "postprocessor_args": {"Merger": ["-nostdin"]},
         "overwrites": True,
         "progress_hooks": [hook],
     }

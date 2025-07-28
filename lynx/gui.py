@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+import subprocess
+import torch
 
 from .processor import Processor
 from .options import load_options, save_options, DEFAULTS
@@ -189,6 +191,9 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(QtWidgets.QLabel("Process progress"))
         layout.addWidget(self.bar_proc)
 
+        self.status_box = QtWidgets.QPlainTextEdit(readOnly=True)
+        layout.addWidget(self.status_box)
+
         self.log_widget = QtWidgets.QPlainTextEdit(readOnly=True)
         layout.addWidget(self.log_widget, stretch=1)
 
@@ -214,6 +219,7 @@ class MainWindow(QtWidgets.QMainWindow):
         handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         logging.getLogger("lynx").addHandler(handler)
         logger.debug("UI initialized")
+        self.update_status_box()
 
     # UI helper methods
     def browse_input(self) -> None:
@@ -237,6 +243,35 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def apply_options(self) -> None:
         self.ed_out.setText(self.opts.get("output", DEFAULTS["output"]))
+        self.update_status_box()
+
+    def update_status_box(self) -> None:
+        """Check environment and display status messages."""
+        lines = []
+        try:
+            subprocess.run(
+                ["ffmpeg", "-version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            lines.append("FFmpeg: OK")
+        except Exception:
+            lines.append("FFmpeg: not found")
+
+        if torch.cuda.is_available():
+            lines.append("CUDA: available")
+        else:
+            lines.append("CUDA: not detected (CPU mode)")
+
+        weights_dir = Path(self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
+        model = weights_dir / "RealESRGAN_x4plus.pth"
+        lines.append(
+            "Model: present" if model.exists() else "Model: missing RealESRGAN_x4plus.pth"
+        )
+
+        self.status_box.setPlainText("\n".join(lines))
+        logger.debug("Status updated: %s", lines)
 
     def log(self, msg: str) -> None:
         logger.info(msg)
