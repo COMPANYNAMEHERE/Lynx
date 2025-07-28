@@ -7,6 +7,20 @@ from pathlib import Path
 from typing import Callable, Optional
 
 
+def yt_title(url: str) -> str:
+    """Return the video title for a YouTube URL using yt-dlp."""
+    try:
+        from yt_dlp import YoutubeDL
+    except Exception:
+        return "video"
+    with YoutubeDL({"quiet": True}) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+            return info.get("title", "video")
+        except Exception:
+            return "video"
+
+
 def is_url(s: str) -> bool:
     """Return True if the string looks like an HTTP/HTTPS URL."""
     return bool(re.match(r"https?://", s, re.I))

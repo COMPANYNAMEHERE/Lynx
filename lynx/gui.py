@@ -11,6 +11,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import subprocess
 import torch
 
+from .download import is_url, yt_title
+from .models import ensure_model, MODEL_SPECS
+
 from .processor import Processor
 from .options import load_options, save_options, DEFAULTS
 from .logger import get_logger
@@ -184,6 +187,20 @@ class MainWindow(QtWidgets.QMainWindow):
         form_out.addWidget(btn_out)
         btn_out.clicked.connect(self.browse_output)
 
+        form_model = QtWidgets.QHBoxLayout()
+        layout.addLayout(form_model)
+        form_model.addWidget(QtWidgets.QLabel("Model:"))
+        self.cmb_model = QtWidgets.QComboBox()
+        self.cmb_model.addItems(list(MODEL_SPECS.keys()))
+        form_model.addWidget(self.cmb_model)
+        self.btn_model_dl = QtWidgets.QPushButton("Download")
+        form_model.addWidget(self.btn_model_dl)
+        self.lbl_model_status = QtWidgets.QLabel()
+        form_model.addWidget(self.lbl_model_status)
+        self.btn_model_dl.clicked.connect(self.download_model)
+        self.cmb_model.currentIndexChanged.connect(self.update_model_status)
+        self.update_model_status()
+
         self.bar_dl = QtWidgets.QProgressBar()
         self.bar_proc = QtWidgets.QProgressBar()
         layout.addWidget(QtWidgets.QLabel("Download progress"))
@@ -226,6 +243,25 @@ class MainWindow(QtWidgets.QMainWindow):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select input video")
         if path:
             self.ed_in.setText(path)
+            self.auto_set_output()
+
+    def auto_set_output(self) -> None:
+        """Set the output path based on the input title if using default name."""
+        out_text = self.ed_out.text().strip()
+        default_out = DEFAULTS["output"]
+        if not out_text or out_text == default_out:
+            inp = self.ed_in.text().strip()
+            if not inp:
+                return
+            if is_url(inp):
+                title = yt_title(inp)
+            else:
+                title = Path(inp).stem
+            safe = "".join(c for c in title if c.isalnum() or c in " -_()").rstrip()
+            if not safe:
+                safe = "output"
+            out_path = Path(default_out).parent / f"{safe}.mp4"
+            self.ed_out.setText(str(out_path))
 
     def browse_output(self) -> None:
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
@@ -265,13 +301,45 @@ class MainWindow(QtWidgets.QMainWindow):
             lines.append("CUDA: not detected (CPU mode)")
 
         weights_dir = Path(self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
-        model = weights_dir / "RealESRGAN_x4plus.pth"
+        model_file = getattr(self, "cmb_model", None)
+        model_name = model_file.currentText() if model_file else "RealESRGAN_x4plus.pth"
+        model_path = weights_dir / model_name
         lines.append(
-            "Model: present" if model.exists() else "Model: missing RealESRGAN_x4plus.pth"
+            f"Model: present" if model_path.exists() else f"Model: missing {model_name}"
         )
+        if model_file:
+            self.update_model_status()
 
         self.status_box.setPlainText("\n".join(lines))
         logger.debug("Status updated: %s", lines)
+
+    def update_model_status(self) -> None:
+        """Update the label showing whether the selected model is present."""
+        weights_dir = Path(self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
+        model_name = self.cmb_model.currentText()
+        if (weights_dir / model_name).exists():
+            self.lbl_model_status.setText("Model online")
+            self.lbl_model_status.setStyleSheet("color: green")
+        else:
+            self.lbl_model_status.setText("Model offline")
+            self.lbl_model_status.setStyleSheet("color: red")
+
+    def download_model(self) -> None:
+        """Fetch the currently selected model."""
+        model_name = self.cmb_model.currentText()
+        weights_dir = Path(self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
+        try:
+            ensure_model(
+                weights_dir,
+                model_name,
+                strict_hash=self.opts.get("strict_model_hash", False),
+                progress_cb=lambda d, t: self.set_progress("download", d, t or 1),
+                log_cb=self.log,
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Download failed", str(e))
+            logger.error("Model download failed: %s", e)
+        self.update_model_status()
 
     def log(self, msg: str) -> None:
         logger.info(msg)
@@ -297,11 +365,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if not out:
             raise RuntimeError("Please choose an output file.")
         cfg = self.opts.copy()
-        cfg.update({"input": inp, "output": out})
+        cfg.update({"input": inp, "output": out, "model": self.cmb_model.currentText()})
         return cfg
 
     def start(self) -> None:
         try:
+            self.auto_set_output()
             cfg = self.collect_cfg()
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Invalid settings", str(e))

@@ -159,7 +159,11 @@ class Processor:
                 log_cb=self._log,
             )
         else:
-            model_file, base_scale = pick_model(target_scale)
+            if cfg.get("model"):
+                model_file = cfg["model"]
+                base_scale = 4 if "x4" in model_file else 2
+            else:
+                model_file, base_scale = pick_model(target_scale)
             model_path = ensure_model(
                 weights_dir,
                 model_file,
