@@ -6,4 +6,4 @@ yt-dlp>=2024.7
 realesrgan>=0.3.0
 # Use the upstream BasicSR (avoids torchvision import issues)
 basicsr @ git+https://github.com/XPixelGroup/BasicSR@master
-customtkinter>=5.2
+PyQt5>=5.15

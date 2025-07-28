@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import tkinter as tk
+from PyQt5 import QtWidgets
 from lynx.logger import get_logger
 
 logger = get_logger()
@@ -11,11 +11,9 @@ logger = get_logger()
 def fatal(msg: str) -> None:
     """Show an error message with an Exit button and stop."""
     logger.error(msg)
-    root = tk.Tk()
-    root.title("Lynx Error")
-    tk.Label(root, text=msg, justify="left", wraplength=400).pack(padx=20, pady=10)
-    tk.Button(root, text="Exit", command=root.destroy).pack(pady=(0, 10))
-    root.mainloop()
+    app = QtWidgets.QApplication([])
+    QtWidgets.QMessageBox.critical(None, "Lynx Error", msg)
+    app.exec_()
 
 
 def safe_main() -> None:
