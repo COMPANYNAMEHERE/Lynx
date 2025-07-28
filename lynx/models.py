@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import os
 import tempfile
+import threading
 import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
@@ -36,7 +37,9 @@ def _download_with_progress(
     strict: bool = False,
     progress_cb: Optional[Callable[[int, int], None]] = None,
     log_cb: Optional[Callable[[str], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> None:
+    """Download ``url`` to ``dest``, reporting progress and supporting cancel."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp_fd, tmp_path = tempfile.mkstemp(prefix=dest.name + ".", dir=str(dest.parent))
     os.close(tmp_fd)
@@ -50,6 +53,9 @@ def _download_with_progress(
         total = int(r.headers.get("Content-Length", "0")) or 0
         downloaded = 0
         while True:
+            if cancel_event and cancel_event.is_set():
+                tmp_path.unlink(missing_ok=True)
+                raise RuntimeError("Operation cancelled")
             chunk = r.read(1024 * 1024)
             if not chunk:
                 break
@@ -57,6 +63,9 @@ def _download_with_progress(
             downloaded += len(chunk)
             if progress_cb:
                 progress_cb(downloaded, total)
+            if cancel_event and cancel_event.is_set():
+                tmp_path.unlink(missing_ok=True)
+                raise RuntimeError("Operation cancelled")
 
     if expected_sha256:
         got = _sha256_of_file(tmp_path)
@@ -65,7 +74,9 @@ def _download_with_progress(
                 tmp_path.unlink(missing_ok=True)
                 raise RuntimeError(f"Checksum mismatch for {dest.name}")
             if log_cb:
-                log_cb(f"⚠ Warning: checksum mismatch for {dest.name}. Using file anyway.")
+                log_cb(
+                    f"⚠ Warning: checksum mismatch for {dest.name}. Using file anyway."
+                )
 
     tmp_path.replace(dest)
     if log_cb:
@@ -78,11 +89,17 @@ def ensure_model(
     strict_hash: bool = False,
     progress_cb: Optional[Callable[[int, int], None]] = None,
     log_cb: Optional[Callable[[str], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> Path:
-    """Ensure the given model file exists in `weights_dir`, downloading if needed."""
+    """Ensure ``model_filename`` exists in ``weights_dir``.
+
+    The download step can be aborted early via ``cancel_event``.
+    """
     spec = MODEL_SPECS.get(model_filename)
     if not spec:
         raise RuntimeError(f"No spec for model {model_filename}")
+    if cancel_event and cancel_event.is_set():
+        raise RuntimeError("Operation cancelled")
 
     dest = weights_dir / model_filename
     if dest.exists() and spec.get("sha256"):
@@ -109,5 +126,6 @@ def ensure_model(
             strict=strict_hash,
             progress_cb=progress_cb,
             log_cb=log_cb,
+            cancel_event=cancel_event,
         )
     return dest
