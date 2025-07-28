@@ -5,13 +5,14 @@ Local YouTube Upscaling toolkit using Real-ESRGAN and NVENC.
 ## Quick start
 
 1. Install Python 3.11 and PyTorch with CUDA support.
-2. Install dependencies:
+2. Create a conda environment and install the requirements using the helper script:
    ```bash
-   pip install -r requirements.txt
+   bash setup.sh
    ```
+   Activate it with `conda activate lynx`.
 3. Run the GUI:
    ```bash
-   python -m lynx
+   python main.py
    ```
 
 ## Directory layout
@@ -32,7 +33,7 @@ Feel free to remove the placeholder files if you wish; the application will recr
 Run the bundled unit tests to verify basic functionality:
 
 ```bash
-python tester.py
+python tests/tester.py
 ```
 
 ## Troubleshooting
