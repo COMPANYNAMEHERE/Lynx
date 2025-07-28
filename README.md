@@ -1,6 +1,8 @@
 # Lynx
 
-Local YouTube Upscaling toolkit using Real-ESRGAN and NVENC.
+Local YouTube upscaling toolkit using Real‑ESRGAN and NVENC.  The
+application ships with a PyQt5 interface that stores its settings in
+`options/settings.json`.
 
 ## Quick start
 
@@ -14,6 +16,9 @@ Local YouTube Upscaling toolkit using Real-ESRGAN and NVENC.
    ```bash
    python main.py
    ```
+   On launch the window shows a status box indicating whether CUDA and
+   required weights are detected. If something is missing, follow the
+   instructions in the log output.
 
 ## Directory layout
 

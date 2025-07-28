@@ -1,304 +1,345 @@
-"""Tkinter GUI for the Lynx upscaler."""
+"""PyQt5 GUI for the Lynx upscaler."""
 from __future__ import annotations
 
+import logging
+import sys
 import threading
 from pathlib import Path
 from typing import Optional
 
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-
+from PyQt5 import QtCore, QtGui, QtWidgets
 import subprocess
+import torch
+
 from .processor import Processor
-from .models import ensure_model
+from .options import load_options, save_options, DEFAULTS
+from .logger import get_logger
+
+logger = get_logger()
 
 
-class SplashScreen:
-    """Simple splash window with status text, progress bar and cancel."""
+class LogHandler(logging.Handler):
+    """Forward log records to a ``QPlainTextEdit``."""
 
-    def __init__(self, root: tk.Tk, cancel_event: threading.Event) -> None:
-        self.cancel_event = cancel_event
-        self.top = tk.Toplevel(root)
-        self.top.title("Lynx Loading")
-        self.top.resizable(False, False)
-        self.top.geometry("360x120")
-        self.top.attributes("-topmost", True)
-        self.var_msg = tk.StringVar(value="Starting…")
-        tk.Label(self.top, textvariable=self.var_msg).pack(pady=10)
-        self.bar = ttk.Progressbar(self.top, maximum=100, length=300)
-        self.bar.pack(pady=10)
-        tk.Button(self.top, text="Cancel", command=self.cancel).pack(pady=(0, 8))
-        self.top.update()
+    def __init__(self, widget: QtWidgets.QPlainTextEdit) -> None:
+        super().__init__()
+        self.widget = widget
 
-    def update(self, msg: str, value: int) -> None:
-        self.var_msg.set(msg)
-        self.bar["value"] = value
-        self.top.update_idletasks()
-
-    def cancel(self) -> None:
-        self.cancel_event.set()
-        self.var_msg.set("Cancelling…")
-        self.top.update()
-
-    def close(self) -> None:
-        self.top.destroy()
+    def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - UI
+        msg = self.format(record)
+        self.widget.appendPlainText(msg)
+        self.widget.verticalScrollBar().setValue(
+            self.widget.verticalScrollBar().maximum()
+        )
 
 
-def preload(root: tk.Tk) -> bool:
-    """Show a temporary splash screen while verifying runtime.
+class OptionsDialog(QtWidgets.QDialog):
+    """Dialog for editing persistent options."""
 
-    Returns ``True`` if startup completed, ``False`` if cancelled.
-    """
+    def __init__(self, opts: dict, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Options")
+        self.opts = opts.copy()
+        self._init_ui()
 
-    cancel_event = threading.Event()
-    splash = SplashScreen(root, cancel_event)
+    def _init_ui(self) -> None:
+        layout = QtWidgets.QVBoxLayout(self)
+        tabs = QtWidgets.QTabWidget()
+        layout.addWidget(tabs)
+        paths = QtWidgets.QWidget()
+        enc = QtWidgets.QWidget()
+        tabs.addTab(paths, "Paths")
+        tabs.addTab(enc, "Encoding")
 
-    # 1. Check FFmpeg
-    splash.update("Checking FFmpeg…", 10)
-    try:
-        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, check=True)
-    except Exception:
-        pass
-    if cancel_event.is_set():
-        splash.close()
-        return False
+        form_paths = QtWidgets.QFormLayout(paths)
+        form_enc = QtWidgets.QFormLayout(enc)
 
-    # 2. Ensure models exist (download if needed)
-    weights = Path("weights")
-    for idx, model in enumerate(["RealESRGAN_x2plus.pth", "RealESRGAN_x4plus.pth"]):
-        if cancel_event.is_set():
-            splash.close()
-            return False
+        self.ed_out = QtWidgets.QLineEdit(self.opts.get("output", DEFAULTS["output"]))
+        self.ed_weights = QtWidgets.QLineEdit(
+            self.opts.get("weights_dir", DEFAULTS["weights_dir"])
+        )
+        self.ed_work = QtWidgets.QLineEdit(self.opts.get("workdir", DEFAULTS["workdir"]))
+        form_paths.addRow("Default output", self.ed_out)
+        form_paths.addRow("Weights folder", self.ed_weights)
+        form_paths.addRow("Work folder", self.ed_work)
 
-        splash.update(f"Loading {model}…", 30 + idx * 30)
+        self.sp_w = QtWidgets.QSpinBox()
+        self.sp_w.setRange(64, 16384)
+        self.sp_w.setValue(int(self.opts.get("target_width", DEFAULTS["target_width"])))
+        self.sp_h = QtWidgets.QSpinBox()
+        self.sp_h.setRange(64, 16384)
+        self.sp_h.setValue(int(self.opts.get("target_height", DEFAULTS["target_height"])))
+        self.sp_tile = QtWidgets.QSpinBox()
+        self.sp_tile.setRange(16, 1024)
+        self.sp_tile.setValue(int(self.opts.get("tile", DEFAULTS["tile"])))
+        self.sp_cq = QtWidgets.QSpinBox()
+        self.sp_cq.setRange(0, 51)
+        self.sp_cq.setValue(int(self.opts.get("cq", DEFAULTS["cq"])))
+        self.cmb_codec = QtWidgets.QComboBox()
+        self.cmb_codec.addItems(["hevc_nvenc", "h264_nvenc"])
+        self.cmb_codec.setCurrentText(self.opts.get("codec", DEFAULTS["codec"]))
+        self.cmb_preset = QtWidgets.QComboBox()
+        self.cmb_preset.addItems([f"p{i}" for i in range(1, 8)])
+        self.cmb_preset.setCurrentText(self.opts.get("preset", DEFAULTS["preset"]))
+        self.chk_fp16 = QtWidgets.QCheckBox()
+        self.chk_fp16.setChecked(bool(self.opts.get("use_fp16", DEFAULTS["use_fp16"])))
+        self.chk_keep = QtWidgets.QCheckBox()
+        self.chk_keep.setChecked(bool(self.opts.get("keep_temps", DEFAULTS["keep_temps"])))
+        self.chk_prefetch = QtWidgets.QCheckBox()
+        self.chk_prefetch.setChecked(bool(self.opts.get("prefetch_models", DEFAULTS["prefetch_models"])))
+        self.chk_strict = QtWidgets.QCheckBox()
+        self.chk_strict.setChecked(bool(self.opts.get("strict_model_hash", DEFAULTS["strict_model_hash"])))
 
-        def prog(d: int, t: int, base: int = idx) -> None:
-            splash.update(
-                f"Loading {model}…",
-                30 + base * 30 + int((d / (t or 1)) * 30),
-            )
+        form_enc.addRow("Width", self.sp_w)
+        form_enc.addRow("Height", self.sp_h)
+        form_enc.addRow("Tile", self.sp_tile)
+        form_enc.addRow("CQ", self.sp_cq)
+        form_enc.addRow("Codec", self.cmb_codec)
+        form_enc.addRow("Preset", self.cmb_preset)
+        form_enc.addRow("Use FP16", self.chk_fp16)
+        form_enc.addRow("Keep temp files", self.chk_keep)
+        form_enc.addRow("Prefetch models", self.chk_prefetch)
+        form_enc.addRow("Verify model hash", self.chk_strict)
 
-        try:
-            ensure_model(
-                weights,
-                model,
-                progress_cb=prog,
-                cancel_event=cancel_event,
-            )
-        except Exception:
-            if cancel_event.is_set():
-                splash.close()
-                return False
-            continue
+        btn_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(btn_row)
+        btn_row.addStretch(1)
+        btn_defaults = QtWidgets.QPushButton("Defaults")
+        btn_save = QtWidgets.QPushButton("Save")
+        btn_close = QtWidgets.QPushButton("Close")
+        btn_row.addWidget(btn_defaults)
+        btn_row.addWidget(btn_save)
+        btn_row.addWidget(btn_close)
+        btn_defaults.clicked.connect(self.set_defaults)
+        btn_save.clicked.connect(self.accept)
+        btn_close.clicked.connect(self.reject)
 
-    if cancel_event.is_set():
-        splash.close()
-        return False
+    def set_defaults(self) -> None:
+        self.ed_out.setText(DEFAULTS["output"])
+        self.ed_weights.setText(DEFAULTS["weights_dir"])
+        self.ed_work.setText(DEFAULTS["workdir"])
+        self.sp_w.setValue(int(DEFAULTS["target_width"]))
+        self.sp_h.setValue(int(DEFAULTS["target_height"]))
+        self.sp_tile.setValue(int(DEFAULTS["tile"]))
+        self.sp_cq.setValue(int(DEFAULTS["cq"]))
+        self.cmb_codec.setCurrentText(DEFAULTS["codec"])
+        self.cmb_preset.setCurrentText(DEFAULTS["preset"])
+        self.chk_fp16.setChecked(bool(DEFAULTS["use_fp16"]))
+        self.chk_keep.setChecked(bool(DEFAULTS["keep_temps"]))
+        self.chk_prefetch.setChecked(bool(DEFAULTS["prefetch_models"]))
+        self.chk_strict.setChecked(bool(DEFAULTS["strict_model_hash"]))
 
-    splash.update("Starting UI…", 100)
-    splash.close()
-    return True
+    def accept(self) -> None:  # pragma: no cover - UI
+        self.opts["output"] = self.ed_out.text().strip()
+        self.opts["weights_dir"] = self.ed_weights.text().strip()
+        self.opts["workdir"] = self.ed_work.text().strip()
+        self.opts["target_width"] = self.sp_w.value()
+        self.opts["target_height"] = self.sp_h.value()
+        self.opts["tile"] = self.sp_tile.value()
+        self.opts["cq"] = self.sp_cq.value()
+        self.opts["codec"] = self.cmb_codec.currentText()
+        self.opts["preset"] = self.cmb_preset.currentText()
+        self.opts["use_fp16"] = self.chk_fp16.isChecked()
+        self.opts["keep_temps"] = self.chk_keep.isChecked()
+        self.opts["prefetch_models"] = self.chk_prefetch.isChecked()
+        self.opts["strict_model_hash"] = self.chk_strict.isChecked()
+        save_options(self.opts)
+        logger.debug("Options saved: %s", self.opts)
+        super().accept()
 
 
-class App:
+class MainWindow(QtWidgets.QMainWindow):
     """Main application window."""
 
-    def __init__(self, root: tk.Tk) -> None:
-        self.root = root
-        root.title("Lynx Upscaler")
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("Lynx Upscaler")
         self.processor: Optional[Processor] = None
+        self.thread: Optional[threading.Thread] = None
+        self.opts = load_options()
+        logger.debug("Options loaded: %s", self.opts)
+        self._init_ui()
 
-        pad = {"padx": 6, "pady": 2}
+    # UI construction
+    def _init_ui(self) -> None:
+        central = QtWidgets.QWidget()
+        self.setCentralWidget(central)
+        layout = QtWidgets.QVBoxLayout(central)
 
-        col1 = tk.Frame(root)
-        col1.pack(fill="both", expand=True)
+        form_in = QtWidgets.QHBoxLayout()
+        layout.addLayout(form_in)
+        self.ed_in = QtWidgets.QLineEdit()
+        form_in.addWidget(QtWidgets.QLabel("Video file or YouTube link:"))
+        form_in.addWidget(self.ed_in)
+        btn_in = QtWidgets.QPushButton("Browse")
+        form_in.addWidget(btn_in)
+        btn_in.clicked.connect(self.browse_input)
 
-        frm_in = tk.Frame(col1)
-        frm_in.pack(fill="x", **pad)
-        self.var_input = tk.StringVar()
-        tk.Label(frm_in, text="Input file / URL").pack(anchor="w")
-        tk.Entry(frm_in, textvariable=self.var_input, width=60).pack(side="left", fill="x", expand=True)
-        tk.Button(frm_in, text="Browse", command=self.browse_input).pack(side="left")
+        form_out = QtWidgets.QHBoxLayout()
+        layout.addLayout(form_out)
+        self.ed_out = QtWidgets.QLineEdit(self.opts.get("output", DEFAULTS["output"]))
+        form_out.addWidget(QtWidgets.QLabel("Save output to:"))
+        form_out.addWidget(self.ed_out)
+        btn_out = QtWidgets.QPushButton("Browse")
+        form_out.addWidget(btn_out)
+        btn_out.clicked.connect(self.browse_output)
 
-        frm_out = tk.Frame(col1)
-        frm_out.pack(fill="x", **pad)
-        self.var_output = tk.StringVar()
-        tk.Label(frm_out, text="Output file").pack(anchor="w")
-        tk.Entry(frm_out, textvariable=self.var_output, width=60).pack(side="left", fill="x", expand=True)
-        tk.Button(frm_out, text="Browse", command=self.browse_output).pack(side="left")
+        self.bar_dl = QtWidgets.QProgressBar()
+        self.bar_proc = QtWidgets.QProgressBar()
+        layout.addWidget(QtWidgets.QLabel("Download progress"))
+        layout.addWidget(self.bar_dl)
+        layout.addWidget(QtWidgets.QLabel("Process progress"))
+        layout.addWidget(self.bar_proc)
 
-        frm_w = tk.Frame(col1)
-        frm_w.pack(fill="x", **pad)
-        self.var_w = tk.IntVar(value=3840)
-        self.var_h = tk.IntVar(value=2160)
-        tk.Label(frm_w, text="Target Width").grid(row=0, column=0, sticky="e")
-        tk.Entry(frm_w, textvariable=self.var_w, width=6).grid(row=0, column=1, sticky="w")
-        tk.Label(frm_w, text="Height").grid(row=0, column=2, sticky="e")
-        tk.Entry(frm_w, textvariable=self.var_h, width=6).grid(row=0, column=3, sticky="w")
+        self.status_box = QtWidgets.QPlainTextEdit(readOnly=True)
+        layout.addWidget(self.status_box)
 
-        frm_paths = tk.Frame(col1)
-        frm_paths.pack(fill="x", **pad)
-        self.var_weights = tk.StringVar(value=str(Path("weights")))
-        self.var_work = tk.StringVar(value=str(Path("work")))
-        tk.Button(frm_paths, text="Weights…", command=self.browse_weights).grid(row=0, column=0)
-        tk.Entry(frm_paths, textvariable=self.var_weights, width=40).grid(row=0, column=1, sticky="w")
-        tk.Button(frm_paths, text="Work…", command=self.browse_work).grid(row=1, column=0)
-        tk.Entry(frm_paths, textvariable=self.var_work, width=40).grid(row=1, column=1, sticky="w")
+        self.log_widget = QtWidgets.QPlainTextEdit(readOnly=True)
+        layout.addWidget(self.log_widget, stretch=1)
 
-        frm_set = tk.Frame(col1)
-        frm_set.pack(fill="x", **pad)
-        tk.Label(frm_set, text="Settings").grid(row=0, column=0, sticky="w", pady=(2, 6))
+        btn_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(btn_row)
+        self.btn_start = QtWidgets.QPushButton("Start")
+        self.btn_cancel = QtWidgets.QPushButton("Cancel")
+        self.btn_cancel.setEnabled(False)
+        btn_row.addWidget(self.btn_start)
+        btn_row.addWidget(self.btn_cancel)
+        self.btn_start.clicked.connect(self.start)
+        self.btn_cancel.clicked.connect(self.cancel)
 
-        self.var_tile = tk.IntVar(value=256)
-        self.var_cq = tk.IntVar(value=19)
-        self.var_codec = tk.StringVar(value="hevc_nvenc")
-        self.var_preset = tk.StringVar(value="p5")
-        self.var_fp16 = tk.BooleanVar(value=True)
-        self.var_keep_temps = tk.BooleanVar(value=False)
-        self.var_prefetch = tk.BooleanVar(value=False)
-        self.var_strict_hash = tk.BooleanVar(value=False)
+        self.status_label = QtWidgets.QLabel("Idle")
+        self.statusBar().addWidget(self.status_label)
 
-        tk.Label(frm_set, text="Tile").grid(row=1, column=0, sticky="e")
-        tk.Entry(frm_set, width=6, textvariable=self.var_tile).grid(row=1, column=1, sticky="w")
+        menu = self.menuBar().addMenu("Settings")
+        act_opts = menu.addAction("Options")
+        act_opts.triggered.connect(self.open_options)
 
-        tk.Label(frm_set, text="CQ").grid(row=1, column=2, sticky="e")
-        tk.Entry(frm_set, width=6, textvariable=self.var_cq).grid(row=1, column=3, sticky="w")
+        # Attach logger to text widget
+        handler = LogHandler(self.log_widget)
+        handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        logging.getLogger("lynx").addHandler(handler)
+        logger.debug("UI initialized")
+        self.update_status_box()
 
-        tk.Label(frm_set, text="Codec").grid(row=2, column=0, sticky="e")
-        ttk.Combobox(frm_set, textvariable=self.var_codec, values=["hevc_nvenc", "h264_nvenc"], width=12, state="readonly").grid(row=2, column=1, sticky="w")
+    # UI helper methods
+    def browse_input(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select input video")
+        if path:
+            self.ed_in.setText(path)
 
-        tk.Label(frm_set, text="Preset").grid(row=2, column=2, sticky="e")
-        ttk.Combobox(frm_set, textvariable=self.var_preset, values=[f"p{i}" for i in range(1, 8)], width=6, state="readonly").grid(row=2, column=3, sticky="w")
+    def browse_output(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save output as", str(Path("outputs") / "output.mp4"), "MP4 files (*.mp4)"
+        )
+        if path:
+            self.ed_out.setText(path)
 
-        tk.Checkbutton(frm_set, text="Use FP16 (RTX)", variable=self.var_fp16).grid(row=3, column=0, sticky="w", pady=2)
-        tk.Checkbutton(frm_set, text="Keep temps", variable=self.var_keep_temps).grid(row=3, column=1, sticky="w")
-        tk.Checkbutton(frm_set, text="Prefetch models", variable=self.var_prefetch).grid(row=3, column=2, sticky="w")
-        tk.Checkbutton(frm_set, text="Strict model hash", variable=self.var_strict_hash).grid(row=3, column=3, sticky="w")
+    def open_options(self) -> None:
+        dlg = OptionsDialog(self.opts, self)
+        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+            self.opts = dlg.opts
+            save_options(self.opts)
+            self.apply_options()
 
-        frm_prog = tk.Frame(col1)
-        frm_prog.pack(fill="x", **pad)
-        tk.Label(frm_prog, text="Download progress").pack(anchor="w")
-        self.bar_dl = ttk.Progressbar(frm_prog, maximum=100)
-        self.bar_dl.pack(fill="x")
-        tk.Label(frm_prog, text="Process progress").pack(anchor="w", pady=(8, 0))
-        self.bar_proc = ttk.Progressbar(frm_prog, maximum=100)
-        self.bar_proc.pack(fill="x")
+    def apply_options(self) -> None:
+        self.ed_out.setText(self.opts.get("output", DEFAULTS["output"]))
+        self.update_status_box()
 
-        self.var_status = tk.StringVar(value="Idle")
-        tk.Label(col1, textvariable=self.var_status).pack(anchor="w", **pad)
-        self.txt_log = tk.Text(col1, height=10)
-        self.txt_log.pack(fill="both", expand=True, **pad)
+    def update_status_box(self) -> None:
+        """Check environment and display status messages."""
+        lines = []
+        try:
+            subprocess.run(
+                ["ffmpeg", "-version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            lines.append("FFmpeg: OK")
+        except Exception:
+            lines.append("FFmpeg: not found")
 
-        frm_btn = tk.Frame(col1)
-        frm_btn.pack(fill="x", **pad)
-        self.btn_run = tk.Button(frm_btn, text="Start", command=self.start)
-        self.btn_run.pack(side="left")
-        self.btn_cancel = tk.Button(frm_btn, text="Cancel", command=self.cancel, state="disabled")
-        self.btn_cancel.pack(side="left", padx=6)
+        if torch.cuda.is_available():
+            lines.append("CUDA: available")
+        else:
+            lines.append("CUDA: not detected (CPU mode)")
+
+        weights_dir = Path(self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
+        model = weights_dir / "RealESRGAN_x4plus.pth"
+        lines.append(
+            "Model: present" if model.exists() else "Model: missing RealESRGAN_x4plus.pth"
+        )
+
+        self.status_box.setPlainText("\n".join(lines))
+        logger.debug("Status updated: %s", lines)
 
     def log(self, msg: str) -> None:
-        self.txt_log.insert("end", msg + "\n")
-        self.txt_log.see("end")
-        self.root.update_idletasks()
+        logger.info(msg)
 
     def set_progress(self, which: str, done: int, total: int) -> None:
         if total <= 0:
             return
-        value = max(0, min(100, int(done * 100 / total)))
+        val = max(0, min(100, int(done * 100 / total)))
         if which == "download":
-            self.bar_dl["value"] = value
+            self.bar_dl.setValue(val)
         else:
-            self.bar_proc["value"] = value
-        self.root.update_idletasks()
+            self.bar_proc.setValue(val)
 
     def set_status(self, msg: str) -> None:
-        self.var_status.set(msg)
-        self.root.update_idletasks()
+        self.status_label.setText(msg)
 
-    def browse_input(self) -> None:
-        path = filedialog.askopenfilename(title="Select input video")
-        if path:
-            self.var_input.set(path)
-
-    def browse_output(self) -> None:
-        path = filedialog.asksaveasfilename(title="Save output as", defaultextension=".mp4", filetypes=[("MP4", "*.mp4")])
-        if path:
-            self.var_output.set(path)
-
-    def browse_weights(self) -> None:
-        path = filedialog.askdirectory(title="Select weights folder")
-        if path:
-            self.var_weights.set(path)
-
-    def browse_work(self) -> None:
-        path = filedialog.askdirectory(title="Select work folder")
-        if path:
-            self.var_work.set(path)
-
+    # Processing controls
     def collect_cfg(self) -> dict:
-        inp = self.var_input.get().strip()
-        out = self.var_output.get().strip()
+        inp = self.ed_in.text().strip()
+        out = self.ed_out.text().strip()
         if not inp:
             raise RuntimeError("Please set an input (file or YouTube URL).")
         if not out:
             raise RuntimeError("Please choose an output file.")
-        return {
-            "input": inp,
-            "output": out,
-            "target_width": int(self.var_w.get()),
-            "target_height": int(self.var_h.get()),
-            "weights_dir": self.var_weights.get().strip(),
-            "workdir": self.var_work.get().strip(),
-            "tile": int(self.var_tile.get()),
-            "cq": int(self.var_cq.get()),
-            "nvenc_codec": self.var_codec.get(),
-            "preset": self.var_preset.get(),
-            "use_fp16": bool(self.var_fp16.get()),
-            "keep_temps": bool(self.var_keep_temps.get()),
-            "prefetch_models": bool(self.var_prefetch.get()),
-            "strict_model_hash": bool(self.var_strict_hash.get()),
-        }
+        cfg = self.opts.copy()
+        cfg.update({"input": inp, "output": out})
+        return cfg
 
     def start(self) -> None:
         try:
             cfg = self.collect_cfg()
         except Exception as e:
-            messagebox.showerror("Invalid settings", str(e))
+            QtWidgets.QMessageBox.critical(self, "Invalid settings", str(e))
+            logger.error("Invalid settings: %s", e)
             return
-
-        self.btn_run.config(state="disabled")
-        self.btn_cancel.config(state="normal")
+        self.btn_start.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+        self.bar_dl.setValue(0)
+        self.bar_proc.setValue(0)
+        self.log_widget.clear()
         self.set_status("Starting…")
-        self.bar_dl["value"] = 0
-        self.bar_proc["value"] = 0
-        self.txt_log.delete("1.0", "end")
-
         self.processor = Processor(self)
-        t = threading.Thread(target=self.processor.run, args=(cfg,), daemon=True)
-        t.start()
+        self.thread = threading.Thread(target=self.processor.run, args=(cfg,), daemon=True)
+        self.thread.start()
+        logger.debug("Processing thread launched")
 
     def cancel(self) -> None:
         if self.processor:
             self.processor.cancel()
             self.set_status("Cancelling…")
-        self.btn_cancel.config(state="disabled")
-        self.btn_run.config(state="normal")
+            logger.info("Cancel requested")
+        self.btn_cancel.setEnabled(False)
+        self.btn_start.setEnabled(True)
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
+        if self.processor:
+            self.processor.cancel()
+        event.accept()
 
 
 def main() -> None:
-    root = tk.Tk()
-    root.withdraw()
-    if not preload(root):
-        root.destroy()
-        return
-    root.deiconify()
-    root.lift()
-    root.attributes("-topmost", True)
-    root.after(0, root.attributes, "-topmost", False)
-    app = App(root)
-    root.minsize(720, 600)
-    root.mainloop()
+    app = QtWidgets.QApplication(sys.argv)
+    win = MainWindow()
+    win.resize(800, 600)
+    win.show()
+    logger.info("Entering mainloop")
+    app.exec_()
+    logger.info("GUI closed")
 
 
 if __name__ == "__main__":

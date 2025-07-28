@@ -7,13 +7,22 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-import cv2
+try:
+    import cv2  # type: ignore
+except Exception as e:  # pragma: no cover - allow starting GUI without cv2
+    cv2 = None  # type: ignore
+    CV2_IMPORT_ERROR = e
+else:
+    CV2_IMPORT_ERROR = None
 import torch
 
 from .download import is_url, yt_download
 from .encode import run_ffmpeg_encode
 from .models import ensure_model
 from .upscale import build_upsampler, pick_model
+from .logger import get_logger
+
+logger = get_logger()
 
 
 class UIHooks:
@@ -36,6 +45,7 @@ class Processor:
 
     # Internal helpers
     def _log(self, msg: str) -> None:
+        logger.info(msg)
         self.ui.log(msg)
 
     def _set_bar(self, which: str, done: int, total: int) -> None:
@@ -43,6 +53,11 @@ class Processor:
 
     def run(self, cfg: dict) -> None:
         """Entry point for the processing thread."""
+        logger.info("Processing thread started")
+        if cv2 is None:
+            raise RuntimeError(
+                f"OpenCV is unavailable: {CV2_IMPORT_ERROR}. Please install opencv-python"
+            )
         try:
             self._log("Checking FFmpeg availability…")
             subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
@@ -194,3 +209,5 @@ class Processor:
                 cancel_event=self.cancel_event,
                 log_cb=self._log,
             )
+
+        logger.info("Processing finished")
