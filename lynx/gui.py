@@ -14,9 +14,10 @@ from .models import ensure_model
 
 
 class SplashScreen:
-    """Simple splash window with status text and progress bar."""
+    """Simple splash window with status text, progress bar and cancel."""
 
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, cancel_event: threading.Event) -> None:
+        self.cancel_event = cancel_event
         self.top = tk.Toplevel(root)
         self.top.title("Lynx Loading")
         self.top.resizable(False, False)
@@ -26,6 +27,7 @@ class SplashScreen:
         tk.Label(self.top, textvariable=self.var_msg).pack(pady=10)
         self.bar = ttk.Progressbar(self.top, maximum=100, length=300)
         self.bar.pack(pady=10)
+        tk.Button(self.top, text="Cancel", command=self.cancel).pack(pady=(0, 8))
         self.top.update()
 
     def update(self, msg: str, value: int) -> None:
@@ -33,14 +35,23 @@ class SplashScreen:
         self.bar["value"] = value
         self.top.update_idletasks()
 
+    def cancel(self) -> None:
+        self.cancel_event.set()
+        self.var_msg.set("Cancelling…")
+        self.top.update()
+
     def close(self) -> None:
         self.top.destroy()
 
 
-def preload(root: tk.Tk) -> None:
-    """Run basic preflight checks while showing a splash screen."""
+def preload(root: tk.Tk) -> bool:
+    """Show a temporary splash screen while verifying runtime.
 
-    splash = SplashScreen(root)
+    Returns ``True`` if startup completed, ``False`` if cancelled.
+    """
+
+    cancel_event = threading.Event()
+    splash = SplashScreen(root, cancel_event)
 
     # 1. Check FFmpeg
     splash.update("Checking FFmpeg…", 10)
@@ -49,22 +60,45 @@ def preload(root: tk.Tk) -> None:
                        stderr=subprocess.DEVNULL, check=True)
     except Exception:
         pass
+    if cancel_event.is_set():
+        splash.close()
+        return False
 
     # 2. Ensure models exist (download if needed)
     weights = Path("weights")
     for idx, model in enumerate(["RealESRGAN_x2plus.pth", "RealESRGAN_x4plus.pth"]):
+        if cancel_event.is_set():
+            splash.close()
+            return False
+
         splash.update(f"Loading {model}…", 30 + idx * 30)
+
+        def prog(d: int, t: int, base: int = idx) -> None:
+            splash.update(
+                f"Loading {model}…",
+                30 + base * 30 + int((d / (t or 1)) * 30),
+            )
+
         try:
-            ensure_model(weights, model,
-                         progress_cb=lambda d, t, base=idx: splash.update(
-                             f"Loading {model}…",
-                             30 + base * 30 + int((d / (t or 1)) * 30)
-                         ))
+            ensure_model(
+                weights,
+                model,
+                progress_cb=prog,
+                cancel_event=cancel_event,
+            )
         except Exception:
+            if cancel_event.is_set():
+                splash.close()
+                return False
             continue
+
+    if cancel_event.is_set():
+        splash.close()
+        return False
 
     splash.update("Starting UI…", 100)
     splash.close()
+    return True
 
 
 class App:
@@ -255,7 +289,9 @@ class App:
 def main() -> None:
     root = tk.Tk()
     root.withdraw()
-    preload(root)
+    if not preload(root):
+        root.destroy()
+        return
     root.deiconify()
     root.lift()
     root.attributes("-topmost", True)
