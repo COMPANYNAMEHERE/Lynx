@@ -5,17 +5,18 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+import customtkinter as ctk
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
 
 
 class Tooltip:
-    """Simple tooltip for Tk widgets."""
+    """Simple tooltip for widgets."""
 
-    def __init__(self, widget: tk.Widget, text: str) -> None:
+    def __init__(self, widget: ctk.CTkBaseClass, text: str) -> None:
         self.widget = widget
         self.text = text
-        self.tip: Optional[tk.Toplevel] = None
+        self.tip: Optional[ctk.CTkToplevel] = None
         widget.bind("<Enter>", self.show)
         widget.bind("<Leave>", self.hide)
 
@@ -24,10 +25,10 @@ class Tooltip:
             return
         x = self.widget.winfo_rootx() + 20
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 10
-        self.tip = tk.Toplevel(self.widget)
+        self.tip = ctk.CTkToplevel(self.widget)
         self.tip.wm_overrideredirect(True)
         self.tip.wm_geometry(f"+{x}+{y}")
-        tk.Label(self.tip, text=self.text, background="#ffffe0", relief="solid", borderwidth=1, padx=4, pady=2).pack()
+        ctk.CTkLabel(self.tip, text=self.text, fg_color="#ffffe0", text_color="black", corner_radius=2).pack(padx=4, pady=2)
 
     def hide(self, _event: object | None = None) -> None:
         if self.tip:
@@ -43,23 +44,24 @@ from .options import load_options, save_options, DEFAULTS
 class SplashScreen:
     """Simple splash window with status text, progress bar and cancel."""
 
-    def __init__(self, root: tk.Tk, cancel_event: threading.Event) -> None:
+    def __init__(self, root: ctk.CTk, cancel_event: threading.Event) -> None:
         self.cancel_event = cancel_event
-        self.top = tk.Toplevel(root)
+        self.top = ctk.CTkToplevel(root)
         self.top.title("Lynx Loading")
         self.top.resizable(False, False)
         self.top.geometry("360x120")
         self.top.attributes("-topmost", True)
-        self.var_msg = tk.StringVar(value="Starting…")
-        tk.Label(self.top, textvariable=self.var_msg).pack(pady=10)
-        self.bar = ttk.Progressbar(self.top, maximum=100, length=300)
+        self.var_msg = ctk.StringVar(value="Starting…")
+        ctk.CTkLabel(self.top, textvariable=self.var_msg).pack(pady=10)
+        self.bar = ctk.CTkProgressBar(self.top, width=300)
         self.bar.pack(pady=10)
-        tk.Button(self.top, text="Cancel", command=self.cancel).pack(pady=(0, 8))
+        self.bar.set(0)
+        ctk.CTkButton(self.top, text="Cancel", command=self.cancel).pack(pady=(0, 8))
         self.top.update()
 
     def update(self, msg: str, value: int) -> None:
         self.var_msg.set(msg)
-        self.bar["value"] = value
+        self.bar.set(value / 100)
         self.top.update_idletasks()
 
     def cancel(self) -> None:
@@ -71,7 +73,7 @@ class SplashScreen:
         self.top.destroy()
 
 
-def preload(root: tk.Tk) -> bool:
+def preload(root: ctk.CTk) -> bool:
     """Show a temporary splash screen while verifying runtime.
 
     Returns ``True`` if startup completed, ``False`` if cancelled.
@@ -131,7 +133,7 @@ def preload(root: tk.Tk) -> bool:
 class App:
     """Main application window."""
 
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: ctk.CTk) -> None:
         self.root = root
         root.title("Lynx Upscaler")
         self.processor: Optional[Processor] = None
@@ -145,108 +147,110 @@ class App:
 
         pad = {"padx": 6, "pady": 2}
 
-        col1 = tk.Frame(root)
+        col1 = ctk.CTkFrame(root)
         col1.pack(fill="both", expand=True)
 
-        frm_in = tk.Frame(col1)
+        frm_in = ctk.CTkFrame(col1)
         frm_in.pack(fill="x", **pad)
-        self.var_input = tk.StringVar()
-        lbl_in = tk.Label(frm_in, text="Video file or YouTube link:")
+        self.var_input = ctk.StringVar()
+        lbl_in = ctk.CTkLabel(frm_in, text="Video file or YouTube link:")
         lbl_in.pack(anchor="w")
-        ent_in = tk.Entry(frm_in, textvariable=self.var_input, width=60)
+        ent_in = ctk.CTkEntry(frm_in, textvariable=self.var_input, width=400)
         ent_in.pack(side="left", fill="x", expand=True)
-        btn_in = tk.Button(frm_in, text="Browse", command=self.browse_input)
+        btn_in = ctk.CTkButton(frm_in, text="Browse", command=self.browse_input)
         btn_in.pack(side="left")
         Tooltip(ent_in, "Choose a local video or paste a YouTube URL")
 
-        frm_out = tk.Frame(col1)
+        frm_out = ctk.CTkFrame(col1)
         frm_out.pack(fill="x", **pad)
-        self.var_output = tk.StringVar(value=self.opts.get("output", DEFAULTS["output"]))
-        lbl_out = tk.Label(frm_out, text="Save output to:")
+        self.var_output = ctk.StringVar(value=self.opts.get("output", DEFAULTS["output"]))
+        lbl_out = ctk.CTkLabel(frm_out, text="Save output to:")
         lbl_out.pack(anchor="w")
-        ent_out = tk.Entry(frm_out, textvariable=self.var_output, width=60)
+        ent_out = ctk.CTkEntry(frm_out, textvariable=self.var_output, width=400)
         ent_out.pack(side="left", fill="x", expand=True)
-        btn_out = tk.Button(frm_out, text="Browse", command=self.browse_output)
+        btn_out = ctk.CTkButton(frm_out, text="Browse", command=self.browse_output)
         btn_out.pack(side="left")
         Tooltip(ent_out, "Destination video file")
 
-        frm_w = tk.Frame(col1)
+        frm_w = ctk.CTkFrame(col1)
         frm_w.pack(fill="x", **pad)
-        self.var_w = tk.IntVar(value=int(self.opts.get("target_width", DEFAULTS["target_width"])))
-        self.var_h = tk.IntVar(value=int(self.opts.get("target_height", DEFAULTS["target_height"])))
-        tk.Label(frm_w, text="Output width").grid(row=0, column=0, sticky="e")
-        ent_w = tk.Entry(frm_w, textvariable=self.var_w, width=6)
+        self.var_w = ctk.IntVar(value=int(self.opts.get("target_width", DEFAULTS["target_width"])))
+        self.var_h = ctk.IntVar(value=int(self.opts.get("target_height", DEFAULTS["target_height"])))
+        ctk.CTkLabel(frm_w, text="Output width").grid(row=0, column=0, sticky="e")
+        ent_w = ctk.CTkEntry(frm_w, textvariable=self.var_w, width=80)
         ent_w.grid(row=0, column=1, sticky="w")
-        tk.Label(frm_w, text="Height").grid(row=0, column=2, sticky="e")
-        ent_h = tk.Entry(frm_w, textvariable=self.var_h, width=6)
+        ctk.CTkLabel(frm_w, text="Height").grid(row=0, column=2, sticky="e")
+        ent_h = ctk.CTkEntry(frm_w, textvariable=self.var_h, width=80)
         ent_h.grid(row=0, column=3, sticky="w")
         Tooltip(ent_w, "Desired output width in pixels")
         Tooltip(ent_h, "Desired output height in pixels")
 
-        frm_paths = tk.Frame(col1)
+        frm_paths = ctk.CTkFrame(col1)
         frm_paths.pack(fill="x", **pad)
-        self.var_weights = tk.StringVar(value=self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
-        self.var_work = tk.StringVar(value=self.opts.get("workdir", DEFAULTS["workdir"]))
-        tk.Label(frm_paths, text="Model folder").grid(row=0, column=0, sticky="e")
-        self.cmb_weights = ttk.Combobox(frm_paths, textvariable=self.var_weights, values=["Browse…"], width=40, state="readonly")
+        self.var_weights = ctk.StringVar(value=self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
+        self.var_work = ctk.StringVar(value=self.opts.get("workdir", DEFAULTS["workdir"]))
+        ctk.CTkLabel(frm_paths, text="Model folder").grid(row=0, column=0, sticky="e")
+        self.cmb_weights = ctk.CTkComboBox(frm_paths, variable=self.var_weights, values=["Browse…"], width=200, state="readonly")
         self.cmb_weights.grid(row=0, column=1, sticky="w")
         self.cmb_weights.bind("<<ComboboxSelected>>", self.browse_weights)
         Tooltip(self.cmb_weights, "Where model weights are stored")
-        tk.Label(frm_paths, text="Work folder").grid(row=1, column=0, sticky="e")
-        self.cmb_work = ttk.Combobox(frm_paths, textvariable=self.var_work, values=["Browse…"], width=40, state="readonly")
+        ctk.CTkLabel(frm_paths, text="Work folder").grid(row=1, column=0, sticky="e")
+        self.cmb_work = ctk.CTkComboBox(frm_paths, variable=self.var_work, values=["Browse…"], width=200, state="readonly")
         self.cmb_work.grid(row=1, column=1, sticky="w")
         self.cmb_work.bind("<<ComboboxSelected>>", self.browse_work)
         Tooltip(self.cmb_work, "Temporary working directory")
 
-        frm_set = tk.Frame(col1)
+        frm_set = ctk.CTkFrame(col1)
         frm_set.pack(fill="x", **pad)
-        tk.Label(frm_set, text="Settings").grid(row=0, column=0, sticky="w", pady=(2, 6))
+        ctk.CTkLabel(frm_set, text="Settings").grid(row=0, column=0, sticky="w", pady=(2, 6))
 
-        self.var_tile = tk.IntVar(value=int(self.opts.get("tile", DEFAULTS["tile"])))
-        self.var_cq = tk.IntVar(value=int(self.opts.get("cq", DEFAULTS["cq"])))
-        self.var_codec = tk.StringVar(value=self.opts.get("codec", DEFAULTS["codec"]))
-        self.var_preset = tk.StringVar(value=self.opts.get("preset", DEFAULTS["preset"]))
-        self.var_fp16 = tk.BooleanVar(value=bool(self.opts.get("use_fp16", DEFAULTS["use_fp16"])))
-        self.var_keep_temps = tk.BooleanVar(value=bool(self.opts.get("keep_temps", DEFAULTS["keep_temps"])))
-        self.var_prefetch = tk.BooleanVar(value=bool(self.opts.get("prefetch_models", DEFAULTS["prefetch_models"])))
-        self.var_strict_hash = tk.BooleanVar(value=bool(self.opts.get("strict_model_hash", DEFAULTS["strict_model_hash"])))
+        self.var_tile = ctk.IntVar(value=int(self.opts.get("tile", DEFAULTS["tile"])))
+        self.var_cq = ctk.IntVar(value=int(self.opts.get("cq", DEFAULTS["cq"])))
+        self.var_codec = ctk.StringVar(value=self.opts.get("codec", DEFAULTS["codec"]))
+        self.var_preset = ctk.StringVar(value=self.opts.get("preset", DEFAULTS["preset"]))
+        self.var_fp16 = ctk.BooleanVar(value=bool(self.opts.get("use_fp16", DEFAULTS["use_fp16"])))
+        self.var_keep_temps = ctk.BooleanVar(value=bool(self.opts.get("keep_temps", DEFAULTS["keep_temps"])))
+        self.var_prefetch = ctk.BooleanVar(value=bool(self.opts.get("prefetch_models", DEFAULTS["prefetch_models"])))
+        self.var_strict_hash = ctk.BooleanVar(value=bool(self.opts.get("strict_model_hash", DEFAULTS["strict_model_hash"])))
 
-        tk.Label(frm_set, text="Tile").grid(row=1, column=0, sticky="e")
-        tk.Entry(frm_set, width=6, textvariable=self.var_tile).grid(row=1, column=1, sticky="w")
+        ctk.CTkLabel(frm_set, text="Tile").grid(row=1, column=0, sticky="e")
+        ctk.CTkEntry(frm_set, width=60, textvariable=self.var_tile).grid(row=1, column=1, sticky="w")
 
-        tk.Label(frm_set, text="CQ").grid(row=1, column=2, sticky="e")
-        tk.Entry(frm_set, width=6, textvariable=self.var_cq).grid(row=1, column=3, sticky="w")
+        ctk.CTkLabel(frm_set, text="CQ").grid(row=1, column=2, sticky="e")
+        ctk.CTkEntry(frm_set, width=60, textvariable=self.var_cq).grid(row=1, column=3, sticky="w")
 
-        tk.Label(frm_set, text="Codec").grid(row=2, column=0, sticky="e")
-        ttk.Combobox(frm_set, textvariable=self.var_codec, values=["hevc_nvenc", "h264_nvenc"], width=12, state="readonly").grid(row=2, column=1, sticky="w")
+        ctk.CTkLabel(frm_set, text="Codec").grid(row=2, column=0, sticky="e")
+        ctk.CTkComboBox(frm_set, variable=self.var_codec, values=["hevc_nvenc", "h264_nvenc"], width=120, state="readonly").grid(row=2, column=1, sticky="w")
 
-        tk.Label(frm_set, text="Preset").grid(row=2, column=2, sticky="e")
-        ttk.Combobox(frm_set, textvariable=self.var_preset, values=[f"p{i}" for i in range(1, 8)], width=6, state="readonly").grid(row=2, column=3, sticky="w")
+        ctk.CTkLabel(frm_set, text="Preset").grid(row=2, column=2, sticky="e")
+        ctk.CTkComboBox(frm_set, variable=self.var_preset, values=[f"p{i}" for i in range(1, 8)], width=60, state="readonly").grid(row=2, column=3, sticky="w")
 
-        tk.Checkbutton(frm_set, text="Use FP16 (RTX only)", variable=self.var_fp16).grid(row=3, column=0, sticky="w", pady=2)
-        tk.Checkbutton(frm_set, text="Keep temp files", variable=self.var_keep_temps).grid(row=3, column=1, sticky="w")
-        tk.Checkbutton(frm_set, text="Download models now", variable=self.var_prefetch).grid(row=3, column=2, sticky="w")
-        tk.Checkbutton(frm_set, text="Verify model hash", variable=self.var_strict_hash).grid(row=3, column=3, sticky="w")
+        ctk.CTkCheckBox(frm_set, text="Use FP16 (RTX only)", variable=self.var_fp16).grid(row=3, column=0, sticky="w", pady=2)
+        ctk.CTkCheckBox(frm_set, text="Keep temp files", variable=self.var_keep_temps).grid(row=3, column=1, sticky="w")
+        ctk.CTkCheckBox(frm_set, text="Download models now", variable=self.var_prefetch).grid(row=3, column=2, sticky="w")
+        ctk.CTkCheckBox(frm_set, text="Verify model hash", variable=self.var_strict_hash).grid(row=3, column=3, sticky="w")
 
-        frm_prog = tk.Frame(col1)
+        frm_prog = ctk.CTkFrame(col1)
         frm_prog.pack(fill="x", **pad)
-        tk.Label(frm_prog, text="Download progress").pack(anchor="w")
-        self.bar_dl = ttk.Progressbar(frm_prog, maximum=100)
+        ctk.CTkLabel(frm_prog, text="Download progress").pack(anchor="w")
+        self.bar_dl = ctk.CTkProgressBar(frm_prog)
         self.bar_dl.pack(fill="x")
-        tk.Label(frm_prog, text="Process progress").pack(anchor="w", pady=(8, 0))
-        self.bar_proc = ttk.Progressbar(frm_prog, maximum=100)
+        self.bar_dl.set(0)
+        ctk.CTkLabel(frm_prog, text="Process progress").pack(anchor="w", pady=(8, 0))
+        self.bar_proc = ctk.CTkProgressBar(frm_prog)
         self.bar_proc.pack(fill="x")
+        self.bar_proc.set(0)
 
-        self.var_status = tk.StringVar(value="Idle")
-        tk.Label(col1, textvariable=self.var_status).pack(anchor="w", **pad)
-        self.txt_log = tk.Text(col1, height=10)
+        self.var_status = ctk.StringVar(value="Idle")
+        ctk.CTkLabel(col1, textvariable=self.var_status).pack(anchor="w", **pad)
+        self.txt_log = ctk.CTkTextbox(col1, height=200)
         self.txt_log.pack(fill="both", expand=True, **pad)
 
-        frm_btn = tk.Frame(col1)
+        frm_btn = ctk.CTkFrame(col1)
         frm_btn.pack(fill="x", **pad)
-        self.btn_run = tk.Button(frm_btn, text="Start", command=self.start)
+        self.btn_run = ctk.CTkButton(frm_btn, text="Start", command=self.start)
         self.btn_run.pack(side="left")
-        self.btn_cancel = tk.Button(frm_btn, text="Cancel", command=self.cancel, state="disabled")
+        self.btn_cancel = ctk.CTkButton(frm_btn, text="Cancel", command=self.cancel, state="disabled")
         self.btn_cancel.pack(side="left", padx=6)
 
         self.apply_options()
@@ -261,9 +265,9 @@ class App:
             return
         value = max(0, min(100, int(done * 100 / total)))
         if which == "download":
-            self.bar_dl["value"] = value
+            self.bar_dl.set(value / 100)
         else:
-            self.bar_proc["value"] = value
+            self.bar_proc.set(value / 100)
         self.root.update_idletasks()
 
     def set_status(self, msg: str) -> None:
@@ -346,38 +350,45 @@ class App:
         if getattr(self, "opt_win", None):
             self.opt_win.lift()
             return
-        self.opt_win = tk.Toplevel(self.root)
+        self.opt_win = ctk.CTkToplevel(self.root)
         self.opt_win.title("Options")
+        tab = ctk.CTkTabview(self.opt_win)
+        tab.pack(fill="both", expand=True, padx=10, pady=10)
+        paths = tab.add("Paths")
+        advanced = tab.add("Encoding")
+
         vars_map = {
-            "output": (tk.StringVar(value=self.opts["output"]), "Default output"),
-            "weights_dir": (tk.StringVar(value=self.opts["weights_dir"]), "Weights folder"),
-            "workdir": (tk.StringVar(value=self.opts["workdir"]), "Work folder"),
-            "target_width": (tk.IntVar(value=self.opts["target_width"]), "Width"),
-            "target_height": (tk.IntVar(value=self.opts["target_height"]), "Height"),
-            "tile": (tk.IntVar(value=self.opts["tile"]), "Tile"),
-            "cq": (tk.IntVar(value=self.opts["cq"]), "CQ"),
-            "codec": (tk.StringVar(value=self.opts["codec"]), "Codec"),
-            "preset": (tk.StringVar(value=self.opts["preset"]), "Preset"),
-            "use_fp16": (tk.BooleanVar(value=self.opts["use_fp16"]), "Use FP16"),
-            "keep_temps": (tk.BooleanVar(value=self.opts["keep_temps"]), "Keep temps"),
-            "prefetch_models": (tk.BooleanVar(value=self.opts["prefetch_models"]), "Prefetch models"),
-            "strict_model_hash": (tk.BooleanVar(value=self.opts["strict_model_hash"]), "Strict hash"),
+            "output": (ctk.StringVar(value=self.opts["output"]), "Default output", paths),
+            "weights_dir": (ctk.StringVar(value=self.opts["weights_dir"]), "Weights folder", paths),
+            "workdir": (ctk.StringVar(value=self.opts["workdir"]), "Work folder", paths),
+            "target_width": (ctk.IntVar(value=self.opts["target_width"]), "Width", advanced),
+            "target_height": (ctk.IntVar(value=self.opts["target_height"]), "Height", advanced),
+            "tile": (ctk.IntVar(value=self.opts["tile"]), "Tile", advanced),
+            "cq": (ctk.IntVar(value=self.opts["cq"]), "CQ", advanced),
+            "codec": (ctk.StringVar(value=self.opts["codec"]), "Codec", advanced),
+            "preset": (ctk.StringVar(value=self.opts["preset"]), "Preset", advanced),
+            "use_fp16": (ctk.BooleanVar(value=self.opts["use_fp16"]), "Use FP16", advanced),
+            "keep_temps": (ctk.BooleanVar(value=self.opts["keep_temps"]), "Keep temps", advanced),
+            "prefetch_models": (ctk.BooleanVar(value=self.opts["prefetch_models"]), "Prefetch models", advanced),
+            "strict_model_hash": (ctk.BooleanVar(value=self.opts["strict_model_hash"]), "Strict hash", advanced),
         }
         self.opt_vars = {k: v[0] for k, v in vars_map.items()}
-        row = 0
-        for key, (var, label) in vars_map.items():
-            if isinstance(var, tk.BooleanVar):
-                tk.Checkbutton(self.opt_win, text=label, variable=var).grid(row=row, column=0, sticky="w", padx=6, pady=2, columnspan=2)
-            else:
-                tk.Label(self.opt_win, text=label).grid(row=row, column=0, sticky="e", padx=6, pady=2)
-                tk.Entry(self.opt_win, textvariable=var, width=30).grid(row=row, column=1, sticky="w", padx=6, pady=2)
-            row += 1
 
-        frm_btn = tk.Frame(self.opt_win)
-        frm_btn.grid(row=row, column=0, columnspan=2, pady=6)
-        tk.Button(frm_btn, text="Defaults", command=self.reset_options).pack(side="left", padx=4)
-        tk.Button(frm_btn, text="Save", command=self.save_options).pack(side="left", padx=4)
-        tk.Button(frm_btn, text="Close", command=self.close_options).pack(side="left", padx=4)
+        rows = {}
+        for key, (var, label, frame) in vars_map.items():
+            r = rows.setdefault(frame, 0)
+            if isinstance(var, ctk.BooleanVar):
+                ctk.CTkCheckBox(frame, text=label, variable=var).grid(row=r, column=0, sticky="w", padx=6, pady=2, columnspan=2)
+            else:
+                ctk.CTkLabel(frame, text=label).grid(row=r, column=0, sticky="e", padx=6, pady=2)
+                ctk.CTkEntry(frame, textvariable=var, width=200).grid(row=r, column=1, sticky="w", padx=6, pady=2)
+            rows[frame] += 1
+
+        frm_btn = ctk.CTkFrame(self.opt_win)
+        frm_btn.pack(pady=6)
+        ctk.CTkButton(frm_btn, text="Defaults", command=self.reset_options).pack(side="left", padx=4)
+        ctk.CTkButton(frm_btn, text="Save", command=self.save_options).pack(side="left", padx=4)
+        ctk.CTkButton(frm_btn, text="Close", command=self.close_options).pack(side="left", padx=4)
 
     def reset_options(self) -> None:
         for k, var in self.opt_vars.items():
@@ -404,8 +415,8 @@ class App:
         self.btn_run.config(state="disabled")
         self.btn_cancel.config(state="normal")
         self.set_status("Starting…")
-        self.bar_dl["value"] = 0
-        self.bar_proc["value"] = 0
+        self.bar_dl.set(0)
+        self.bar_proc.set(0)
         self.txt_log.delete("1.0", "end")
 
         self.processor = Processor(self)
@@ -421,7 +432,8 @@ class App:
 
 
 def main() -> None:
-    root = tk.Tk()
+    ctk.set_appearance_mode("Dark")
+    root = ctk.CTk()
     root.withdraw()
     if not preload(root):
         root.destroy()
