@@ -4,6 +4,10 @@ from __future__ import annotations
 import sys
 from types import ModuleType
 
+from .logger import get_logger
+
+logger = get_logger()
+
 
 def patch_torchvision() -> None:
     """Ensure ``torchvision.transforms.functional_tensor`` exists.
@@ -21,7 +25,9 @@ def patch_torchvision() -> None:
 
     try:
         import torchvision.transforms._functional_tensor as _ft
-    except Exception:
+    except Exception as exc:
+        logger.warning("torchvision shim skipped: %s", exc)
+        sys.modules.pop("torchvision", None)
         return
 
     shim = ModuleType("torchvision.transforms.functional_tensor")
