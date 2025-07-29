@@ -38,6 +38,18 @@ class TestHelpers(unittest.TestCase):
         patch_torchvision()
         self.assertIn('torchvision.transforms.functional_tensor', sys.modules)
 
+    def test_detect_gpu_info(self):
+        from lynx.env import detect_gpu_info
+        from unittest import mock
+
+        with mock.patch('shutil.which') as m_which:
+            m_which.side_effect = lambda c: '/usr/bin/nvidia-smi' if c == 'nvidia-smi' else None
+            with mock.patch('subprocess.check_output', return_value='GPU 0: Fake'):
+                self.assertEqual(detect_gpu_info(), 'GPU 0: Fake')
+
+        with mock.patch('shutil.which', return_value=None):
+            self.assertIsNone(detect_gpu_info())
+
     def test_yt_download_env_restore(self):
         from lynx import download as dl
         from unittest import mock

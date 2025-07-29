@@ -21,7 +21,8 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
    ```
    On launch the window shows a status box indicating whether CUDA and
    required weights are detected. If something is missing, follow the
-   instructions in the log output.
+   instructions in the log output. If you see "GPU detected but PyTorch
+   CPU-only", reinstall PyTorch with CUDA support.
 
 ## Directory layout
 
