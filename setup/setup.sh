@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-# Interactive setup script for Lynx
+# Interactive setup script for Lynx with verbose logging
 
-set -e
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+LOG_FILE="$SCRIPT_DIR/setup.log"
 ENV_NAME="${1:-lynx}"
+
+# Log everything to stdout and the log file
+mkdir -p "$SCRIPT_DIR"
+echo "Logging to $LOG_FILE"
+exec > >(tee -a "$LOG_FILE") 2>&1
+set -x
+echo "Running $0 $*"
 
 cat <<EOF
 This script will create or update the conda environment '$ENV_NAME'.
@@ -17,6 +27,7 @@ case "$ans" in
 esac
 
 echo "Checking existing environment..."
+conda env list
 if conda env list | awk '{print $1}' | grep -Fxq "$ENV_NAME"; then
     echo "Environment '$ENV_NAME' already exists. Updating packages..."
     CREATE_ENV=0
@@ -26,14 +37,20 @@ else
     CREATE_ENV=1
 fi
 
-echo "Installing/updating requirements..."
-conda run -n "$ENV_NAME" pip install -r requirements.txt -U --progress-bar on
+echo "Installing/updating requirements from $REPO_DIR/requirements.txt..."
+conda run -n "$ENV_NAME" pip install -r "$REPO_DIR/requirements.txt" -U --progress-bar on
+conda run -n "$ENV_NAME" pip list
 
 # Install PyTorch matching the detected CUDA version
 echo "Detecting CUDA..."
 CUDA_VERSION=""
 if command -v nvidia-smi >/dev/null 2>&1; then
     CUDA_VERSION=$(nvidia-smi | grep -o 'CUDA Version: [0-9.]*' | head -n1 | awk '{print $3}')
+fi
+if [ -n "$CUDA_VERSION" ]; then
+    echo "Found CUDA version $CUDA_VERSION"
+else
+    echo "No CUDA detected"
 fi
 TORCH_TAG="cpu"
 if [ -n "$CUDA_VERSION" ]; then
@@ -59,8 +76,9 @@ if [ "$CREATE_ENV" -eq 0 ]; then
         echo "$OUTDATED" | while IFS= read -r line; do echo " - $line"; done
         echo "Updating outdated packages..."
         conda run -n "$ENV_NAME" pip install -U $(echo "$OUTDATED" | cut -d= -f1 | tr '\n' ' ') --progress-bar on
+        conda run -n "$ENV_NAME" pip list
     else
-        echo "All packages up to date." 
+        echo "All packages up to date."
     fi
 fi
 

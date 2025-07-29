@@ -10,9 +10,10 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
 1. Install Python 3.11. PyTorch will be installed automatically by the setup script.
 2. Run the setup script and follow the prompts to create or update the conda environment:
    ```bash
-   bash setup.sh
+   bash setup/setup.sh
    ```
    Activate it with `conda activate lynx`.
+   The script logs all actions to `setup/setup.log` for troubleshooting.
 3. Run the GUI:
    ```bash
    python main.py
@@ -30,6 +31,7 @@ These folders are created for you and kept in version control as placeholders:
   - `work/downloads/` – YouTube downloads.
   - `work/temp/` – transient files cleaned after each run.
 - `outputs/` – final encoded videos.
+- `setup/` – the setup script and `setup.log` file.
 - `logs/` – legacy location for run logs. Recent versions store logs under
   the user's OS data directory (e.g. `~/.local/state/lynx/logs` or
   `%LOCALAPPDATA%\Lynx\logs`).
