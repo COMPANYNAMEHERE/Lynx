@@ -1,4 +1,4 @@
-# Core deps (PyTorch is installed separately)
+# Core deps (PyTorch installed by setup.sh)
 numpy>=1.24
 opencv-python>=4.9
 tqdm>=4.66
