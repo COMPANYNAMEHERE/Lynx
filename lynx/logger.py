@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import logging
+import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
+def _default_log_dir() -> Path:
+    """Return an OS-appropriate log directory."""
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        return base / "Lynx" / "logs"
+    return Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "lynx" / "logs"
+
+
+LOG_DIR = _default_log_dir()
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 _logger = logging.getLogger("lynx")
 
@@ -14,7 +24,9 @@ def setup() -> logging.Logger:
     if not _logger.handlers:
         _logger.setLevel(logging.DEBUG)
         fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        fh = logging.FileHandler(LOG_DIR / "lynx.log", encoding="utf-8")
+        fh = RotatingFileHandler(
+            LOG_DIR / "lynx.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+        )
         fh.setFormatter(fmt)
         sh = logging.StreamHandler()
         sh.setFormatter(fmt)

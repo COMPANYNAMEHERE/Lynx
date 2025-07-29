@@ -46,7 +46,6 @@ class Processor:
     # Internal helpers
     def _log(self, msg: str) -> None:
         logger.info(msg)
-        self.ui.log(msg)
 
     def _set_bar(self, which: str, done: int, total: int) -> None:
         self.ui.set_progress(which, done, total)
@@ -152,7 +151,7 @@ class Processor:
                 out_h,
                 fps,
                 out_path,
-                cfg["nvenc_codec"],
+                cfg["codec"],
                 cfg["preset"],
                 cfg["cq"],
                 cancel_event=self.cancel_event,
@@ -203,7 +202,7 @@ class Processor:
                 out_h,
                 fps,
                 out_path,
-                cfg["nvenc_codec"],
+                cfg["codec"],
                 cfg["preset"],
                 cfg["cq"],
                 cancel_event=self.cancel_event,
