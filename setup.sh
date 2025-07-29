@@ -1,21 +1,40 @@
 #!/usr/bin/env bash
-# Simple setup script for Lynx
-ENV_NAME="${1:-lynx}"
+# Interactive setup script for Lynx
 
 set -e
+ENV_NAME="${1:-lynx}"
 
-echo "Creating conda environment '$ENV_NAME'..."
-conda create -n "$ENV_NAME" python=3.11 -y
+cat <<EOF
+This script will create or update the conda environment '$ENV_NAME'.
+It installs Python 3.11, packages from requirements.txt and a matching
+PyTorch build for your GPU.
+EOF
 
-echo "Installing requirements..."
-conda run -n "$ENV_NAME" pip install -r requirements.txt
+read -rp "Continue? [y/N] " ans
+case "$ans" in
+    [yY]*) ;;
+    *) echo "Aborted."; exit 1 ;;
+esac
+
+echo "Checking existing environment..."
+if conda env list | awk '{print $1}' | grep -Fxq "$ENV_NAME"; then
+    echo "Environment '$ENV_NAME' already exists. Updating packages..."
+    CREATE_ENV=0
+else
+    echo "Creating conda environment '$ENV_NAME'..."
+    conda create -n "$ENV_NAME" python=3.11 -y
+    CREATE_ENV=1
+fi
+
+echo "Installing/updating requirements..."
+conda run -n "$ENV_NAME" pip install -r requirements.txt -U --progress-bar on
 
 # Install PyTorch matching the detected CUDA version
+echo "Detecting CUDA..."
 CUDA_VERSION=""
 if command -v nvidia-smi >/dev/null 2>&1; then
     CUDA_VERSION=$(nvidia-smi | grep -o 'CUDA Version: [0-9.]*' | head -n1 | awk '{print $3}')
 fi
-
 TORCH_TAG="cpu"
 if [ -n "$CUDA_VERSION" ]; then
     case "$CUDA_VERSION" in
@@ -26,13 +45,24 @@ fi
 
 if [ "$TORCH_TAG" = "cpu" ]; then
     echo "Installing CPU-only PyTorch..."
-    conda run -n "$ENV_NAME" pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    conda run -n "$ENV_NAME" pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --progress-bar on
 else
     echo "Installing PyTorch for $TORCH_TAG..."
-    conda run -n "$ENV_NAME" pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG
+    conda run -n "$ENV_NAME" pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG --progress-bar on
 fi
 
-echo "All done! Activate the environment with:"
-echo "  conda activate $ENV_NAME"
-echo "Then launch the GUI with:"
-echo "  python main.py"
+# Optional check for outdated packages if environment already existed
+if [ "$CREATE_ENV" -eq 0 ]; then
+    echo "Checking for outdated packages..."
+    OUTDATED=$(conda run -n "$ENV_NAME" pip list --outdated --format=freeze)
+    if [ -n "$OUTDATED" ]; then
+        echo "$OUTDATED" | while IFS= read -r line; do echo " - $line"; done
+        echo "Updating outdated packages..."
+        conda run -n "$ENV_NAME" pip install -U $(echo "$OUTDATED" | cut -d= -f1 | tr '\n' ' ') --progress-bar on
+    else
+        echo "All packages up to date." 
+    fi
+fi
+
+echo "All done! Activate the environment with:\n  conda activate $ENV_NAME"
+echo "Then launch the GUI with:\n  python main.py"
