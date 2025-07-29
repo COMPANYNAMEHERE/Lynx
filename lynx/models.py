@@ -10,6 +10,10 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Optional
 
+from .logger import get_logger
+
+logger = get_logger()
+
 MODEL_SPECS = {
     "RealESRGAN_x2plus.pth": {
         "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
@@ -45,6 +49,8 @@ def _download_with_progress(
     os.close(tmp_fd)
     tmp_path = Path(tmp_path)
 
+    logger.info("Fetching %s", dest.name)
+
     if log_cb:
         log_cb(f"Downloading {dest.name}…")
 
@@ -55,6 +61,7 @@ def _download_with_progress(
         while True:
             if cancel_event and cancel_event.is_set():
                 tmp_path.unlink(missing_ok=True)
+                logger.warning("Download of %s cancelled", dest.name)
                 raise RuntimeError("Operation cancelled")
             chunk = r.read(1024 * 1024)
             if not chunk:
@@ -65,6 +72,7 @@ def _download_with_progress(
                 progress_cb(downloaded, total)
             if cancel_event and cancel_event.is_set():
                 tmp_path.unlink(missing_ok=True)
+                logger.warning("Download of %s cancelled", dest.name)
                 raise RuntimeError("Operation cancelled")
 
     if expected_sha256:
@@ -81,6 +89,7 @@ def _download_with_progress(
     tmp_path.replace(dest)
     if log_cb:
         log_cb(f"Saved {dest.name}")
+    logger.info("Saved %s", dest.name)
 
 
 def ensure_model(
@@ -99,6 +108,7 @@ def ensure_model(
     if not spec:
         raise RuntimeError(f"No spec for model {model_filename}")
     if cancel_event and cancel_event.is_set():
+        logger.warning("Model download cancelled")
         raise RuntimeError("Operation cancelled")
 
     dest = weights_dir / model_filename
