@@ -17,19 +17,27 @@ from .logger import get_logger
 logger = get_logger()
 
 
-class LogHandler(logging.Handler):
-    """Forward log records to a ``QPlainTextEdit``."""
+class LogHandler(logging.Handler, QtCore.QObject):
+    """Forward log records to a ``QPlainTextEdit`` safely across threads."""
+
+    log_signal = QtCore.pyqtSignal(str)
 
     def __init__(self, widget: QtWidgets.QPlainTextEdit) -> None:
-        super().__init__()
+        QtCore.QObject.__init__(self)
+        logging.Handler.__init__(self)
         self.widget = widget
+        self.log_signal.connect(self._append)
 
-    def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - UI
-        msg = self.format(record)
+    @QtCore.pyqtSlot(str)
+    def _append(self, msg: str) -> None:  # pragma: no cover - UI
         self.widget.appendPlainText(msg)
         self.widget.verticalScrollBar().setValue(
             self.widget.verticalScrollBar().maximum()
         )
+
+    def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - UI
+        msg = self.format(record)
+        self.log_signal.emit(msg)
 
 
 class ProcessorThread(QtCore.QThread):
@@ -166,6 +174,10 @@ class OptionsDialog(QtWidgets.QDialog):
 class MainWindow(QtWidgets.QMainWindow):
     """Main application window."""
 
+    log_signal = QtCore.pyqtSignal(str)
+    progress_signal = QtCore.pyqtSignal(str, int, int)
+    status_signal = QtCore.pyqtSignal(str)
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Lynx Upscaler")
@@ -237,6 +249,12 @@ class MainWindow(QtWidgets.QMainWindow):
         handler = LogHandler(self.log_widget)
         handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
         logging.getLogger("lynx").addHandler(handler)
+
+        # cross-thread GUI updates
+        self.log_signal.connect(self._append_log)
+        self.progress_signal.connect(self._update_progress)
+        self.status_signal.connect(self.status_label.setText)
+
         logger.debug("UI initialized")
         self.update_status_box()
 
@@ -292,20 +310,31 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status_box.setPlainText("\n".join(lines))
         logger.debug("Status updated: %s", lines)
 
-    def log(self, msg: str) -> None:
-        logger.info(msg)
+    @QtCore.pyqtSlot(str)
+    def _append_log(self, msg: str) -> None:  # pragma: no cover - UI
+        self.log_widget.appendPlainText(msg)
+        self.log_widget.verticalScrollBar().setValue(
+            self.log_widget.verticalScrollBar().maximum()
+        )
 
-    def set_progress(self, which: str, done: int, total: int) -> None:
+    @QtCore.pyqtSlot(str, int, int)
+    def _update_progress(self, which: str, done: int, total: int) -> None:
         bar = self.bar_dl if which == "download" else self.bar_proc
         if total <= 0:
-            bar.setRange(0, 0)  # busy mode
+            bar.setRange(0, 0)
             return
         bar.setRange(0, 100)
         val = max(0, min(100, int(done * 100 / total)))
         bar.setValue(val)
 
+    def log(self, msg: str) -> None:
+        self.log_signal.emit(msg)
+
+    def set_progress(self, which: str, done: int, total: int) -> None:
+        self.progress_signal.emit(which, done, total)
+
     def set_status(self, msg: str) -> None:
-        self.status_label.setText(msg)
+        self.status_signal.emit(msg)
 
     # Processing controls
     def collect_cfg(self) -> Optional[dict]:
