@@ -8,6 +8,7 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
 ## Quick start
 
 1. Install Python 3.11. PyTorch will be installed automatically by the setup script.
+   The script detects CUDA via `nvidia-smi` or `nvcc` and installs the matching build.
 2. Run the setup script and follow the prompts to create or update the conda environment:
    ```bash
    bash setup/setup.sh

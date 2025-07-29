@@ -47,6 +47,9 @@ CUDA_VERSION=""
 if command -v nvidia-smi >/dev/null 2>&1; then
     CUDA_VERSION=$(nvidia-smi | grep -o 'CUDA Version: [0-9.]*' | head -n1 | awk '{print $3}')
 fi
+if [ -z "$CUDA_VERSION" ] && command -v nvcc >/dev/null 2>&1; then
+    CUDA_VERSION=$(nvcc --version | grep -o -E 'release [0-9]+\.[0-9]+' | head -n1 | awk '{print $2}')
+fi
 if [ -n "$CUDA_VERSION" ]; then
     echo "Found CUDA version $CUDA_VERSION"
 else
