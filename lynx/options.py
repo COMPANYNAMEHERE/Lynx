@@ -2,13 +2,23 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict
+
 from .logger import get_logger
 
 logger = get_logger()
 
-OPTIONS_DIR = Path("options")
+def _default_options_dir() -> Path:
+    """Return an OS-appropriate directory for persistent settings."""
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        return base / "Lynx"
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "lynx"
+
+
+OPTIONS_DIR = _default_options_dir()
 OPTIONS_FILE = OPTIONS_DIR / "settings.json"
 
 DEFAULTS: Dict[str, Any] = {
@@ -28,13 +38,32 @@ DEFAULTS: Dict[str, Any] = {
 }
 
 
+def _validate(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate option values, falling back to defaults for invalid ones."""
+    clean: Dict[str, Any] = {}
+    for key, default in DEFAULTS.items():
+        if key not in data:
+            continue
+        val = data[key]
+        if isinstance(default, bool):
+            if isinstance(val, bool):
+                clean[key] = val
+        elif isinstance(default, int):
+            if isinstance(val, int) and val > 0:
+                clean[key] = val
+        else:
+            if isinstance(val, str) and val:
+                clean[key] = val
+    return clean
+
+
 def load_options() -> Dict[str, Any]:
     """Load saved options, falling back to defaults."""
     if OPTIONS_FILE.exists():
         try:
             data = json.loads(OPTIONS_FILE.read_text())
             opts = DEFAULTS.copy()
-            opts.update({k: data.get(k, v) for k, v in DEFAULTS.items()})
+            opts.update(_validate(data))
             logger.debug("Loaded options from %s", OPTIONS_FILE)
             return opts
         except Exception:
@@ -44,6 +73,6 @@ def load_options() -> Dict[str, Any]:
 
 def save_options(opts: Dict[str, Any]) -> None:
     """Persist options to disk."""
-    OPTIONS_DIR.mkdir(exist_ok=True)
+    OPTIONS_DIR.mkdir(parents=True, exist_ok=True)
     OPTIONS_FILE.write_text(json.dumps(opts, indent=2))
     logger.debug("Saved options to %s", OPTIONS_FILE)

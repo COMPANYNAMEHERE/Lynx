@@ -50,19 +50,31 @@ def run_ffmpeg_encode(
     ]
     if log_cb:
         log_cb("Starting FFmpeg encode…")
-    enc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+    enc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         for frame in rgb_frame_iter:
             if cancel_event.is_set():
                 if log_cb:
-                    log_cb("Cancel requested. Stopping encode…")
+                    log_cb("Cancel requested. Terminating FFmpeg…")
+                enc.terminate()
                 break
-            enc.stdin.write(frame.tobytes())
+            try:
+                enc.stdin.write(frame.tobytes())
+            except BrokenPipeError:
+                if log_cb:
+                    log_cb("FFmpeg pipe closed unexpectedly")
+                break
     finally:
         try:
             enc.stdin.close()
         except Exception:
             pass
+        stderr = b""
+        if enc.stderr:
+            try:
+                stderr = enc.stderr.read()
+            except Exception:
+                pass
         enc.wait()
 
     if cancel_event.is_set():
@@ -73,4 +85,5 @@ def run_ffmpeg_encode(
             pass
         raise RuntimeError("Operation cancelled.")
     if enc.returncode != 0:
-        raise RuntimeError("FFmpeg encode failed.")
+        msg = stderr.decode("utf-8", "ignore").strip()
+        raise RuntimeError(f"FFmpeg encode failed: {msg}")

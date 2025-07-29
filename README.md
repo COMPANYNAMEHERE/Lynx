@@ -1,8 +1,9 @@
 # Lynx
 
 Local YouTube upscaling toolkit using Real‑ESRGAN and NVENC.  The
-application ships with a PyQt5 interface that stores its settings in
-`options/settings.json`.
+application ships with a PyQt5 interface that stores its settings under your
+OS configuration directory, e.g. `~/.config/lynx/settings.json` or
+`%LOCALAPPDATA%\Lynx\settings.json`.
 
 ## Quick start
 
@@ -29,7 +30,11 @@ These folders are created for you and kept in version control as placeholders:
   - `work/downloads/` – YouTube downloads.
   - `work/temp/` – transient files cleaned after each run.
 - `outputs/` – final encoded videos.
-- `logs/` – run logs and diagnostics.
+- `logs/` – legacy location for run logs. Recent versions store logs under
+  the user's OS data directory (e.g. `~/.local/state/lynx/logs` or
+  `%LOCALAPPDATA%\Lynx\logs`).
+- `options/` – legacy settings directory. Current releases use the user's OS
+  configuration directory instead (e.g. `~/.config/lynx`).
 
 Feel free to remove the placeholder files if you wish; the application will recreate any missing directories at runtime.
 
