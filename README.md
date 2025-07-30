@@ -11,7 +11,7 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
    The script detects CUDA via `nvidia-smi` or `nvcc` and installs the matching build.
 2. Run the setup script and follow the prompts to create or update the conda environment:
    ```bash
-   bash setup/setup.sh
+   bash setup.sh
    ```
    Activate it with `conda activate lynx`.
    The script logs all actions to `setup/setup.log` for troubleshooting.
@@ -33,7 +33,8 @@ These folders are created for you and kept in version control as placeholders:
   - `work/downloads/` – YouTube downloads.
   - `work/temp/` – transient files cleaned after each run.
 - `outputs/` – final encoded videos.
-- `setup/` – the setup script and `setup.log` file.
+- `setup.sh` – creates/updates the conda environment and installs PyTorch.
+- `setup/` – contains `setup.log`.
 - `logs/` – legacy location for run logs. Recent versions store logs under
   the user's OS data directory (e.g. `~/.local/state/lynx/logs` or
   `%LOCALAPPDATA%\Lynx\logs`).
@@ -56,7 +57,7 @@ Common issues:
 
 - **Missing torchvision functional_tensor** – Import ``lynx`` first so the included
   shim can patch torchvision automatically.
-- **GPU detected but PyTorch CPU-only** – Rerun ``setup/setup.sh`` or reinstall
+- **GPU detected but PyTorch CPU-only** – Rerun ``setup.sh`` or reinstall
   PyTorch with CUDA support.
 - **`conda` not found** – Install Miniconda or Anaconda and make sure ``conda``
   is on your ``PATH``.

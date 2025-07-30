@@ -3,12 +3,12 @@
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(dirname "$SCRIPT_DIR")"
-LOG_FILE="$SCRIPT_DIR/setup.log"
+REPO_DIR="$SCRIPT_DIR"
+LOG_FILE="$SCRIPT_DIR/setup/setup.log"
 ENV_NAME="${1:-lynx}"
 
 # Log everything to stdout and the log file
-mkdir -p "$SCRIPT_DIR"
+mkdir -p "$(dirname "$LOG_FILE")"
 echo "Logging to $LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 set -x
