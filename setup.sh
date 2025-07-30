@@ -7,15 +7,23 @@ REPO_DIR="$SCRIPT_DIR"
 LOG_FILE="$SCRIPT_DIR/setup/setup.log"
 ENV_NAME="${1:-lynx}"
 
+# Colours
+bold=$(tput bold)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+yellow=$(tput setaf 3)
+blue=$(tput setaf 4)
+reset=$(tput sgr0)
+
 # Log everything to stdout and the log file
 mkdir -p "$(dirname "$LOG_FILE")"
-echo "Logging to $LOG_FILE"
+echo "${bold}Logging to $LOG_FILE${reset}"
 exec > >(tee -a "$LOG_FILE") 2>&1
 set -x
 echo "Running $0 $*"
 
 cat <<EOF
-This script will create or update the conda environment '$ENV_NAME'.
+${bold}${blue}This script will create or update the conda environment '$ENV_NAME'.${reset}
 It installs Python 3.11, packages from requirements.txt and a matching
 PyTorch build for your GPU.
 EOF
@@ -29,8 +37,18 @@ esac
 echo "Checking existing environment..."
 conda env list
 if conda env list | awk '{print $1}' | grep -Fxq "$ENV_NAME"; then
-    echo "Environment '$ENV_NAME' already exists. Updating packages..."
-    CREATE_ENV=0
+    echo "${yellow}Environment '$ENV_NAME' already exists.${reset}"
+    read -rp "Reset it completely? [y/N] " resp
+    if [[ $resp =~ ^[yY] ]]; then
+        echo "Removing existing environment..."
+        conda env remove -n "$ENV_NAME" -y
+        echo "Creating conda environment '$ENV_NAME'..."
+        conda create -n "$ENV_NAME" python=3.11 -y
+        CREATE_ENV=1
+    else
+        echo "Updating packages in existing environment..."
+        CREATE_ENV=0
+    fi
 else
     echo "Creating conda environment '$ENV_NAME'..."
     conda create -n "$ENV_NAME" python=3.11 -y
@@ -85,5 +103,21 @@ if [ "$CREATE_ENV" -eq 0 ]; then
     fi
 fi
 
-echo "All done! Activate the environment with:\n  conda activate $ENV_NAME"
+PYTORCH_VERSION=$(conda run -n "$ENV_NAME" python -c "import torch,sys;sys.stdout.write(torch.__version__)")
+CUDA_AVAIL=$(conda run -n "$ENV_NAME" python -c "import torch,sys;sys.stdout.write('yes' if torch.cuda.is_available() else 'no')")
+
+echo -e "${green}All done!${reset} Activate the environment with:\n  conda activate $ENV_NAME"
 echo "Then launch the GUI with:\n  python main.py"
+echo
+if [ "$CUDA_AVAIL" = "yes" ]; then
+    echo -e "${green}PyTorch CUDA support detected.${reset}"
+else
+    echo -e "${yellow}PyTorch reports no CUDA support.${reset}"
+fi
+if command -v nvidia-smi >/dev/null 2>&1 || command -v nvcc >/dev/null 2>&1; then
+    echo -e "${green}GPU hardware detected on your system.${reset}"
+else
+    echo -e "${red}No NVIDIA GPU detected.${reset}"
+fi
+
+read -rp "Press Enter to exit" _
