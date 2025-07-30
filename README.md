@@ -9,20 +9,17 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
 
 1. Install Python 3.11. PyTorch will be installed automatically by the setup script.
    The script detects CUDA via `nvidia-smi` or `nvcc` and installs the matching build.
-2. Run the setup script and follow the prompts to create or update the conda environment.  The script shows a summary of your CUDA status and waits for input before exiting:
+2. Run the setup script and follow the prompts to create or update the conda environment.  When it finishes it prints the exact commands to run next:
    ```bash
    bash setup.sh
    ```
-   Activate it with `conda activate lynx`.
-   The script logs all actions to `setup/setup.log` for troubleshooting.
-3. Run the GUI:
+   The log of all actions is saved to `setup/setup.log` for troubleshooting.
+3. Activate the environment and start the GUI:
    ```bash
+   conda activate lynx
    python main.py
    ```
-   On launch the window shows a status box indicating whether CUDA and
-   required weights are detected. If something is missing, follow the
-   instructions in the log output. If you see "GPU detected but PyTorch
-   CPU-only", reinstall PyTorch with CUDA support.
+   The window shows a status box indicating whether CUDA and the required weights are detected. If you see "GPU detected but PyTorch CPU-only" follow the reinstall notes below.
 
 ## Directory layout
 
@@ -57,8 +54,11 @@ Common issues:
 
 - **Missing torchvision functional_tensor** – Import ``lynx`` first so the included
   shim can patch torchvision automatically.
-- **GPU detected but PyTorch CPU-only** – Rerun ``setup.sh`` or reinstall
-  PyTorch with CUDA support.
+- **GPU detected but PyTorch CPU-only** – Rerun ``setup.sh``. If it still installs
+  the CPU build, reinstall manually for your CUDA version, e.g.:
+  ```bash
+  conda run -n lynx pip install --force-reinstall torch torchvision --extra-index-url https://download.pytorch.org/whl/cu118
+  ```
 - **`conda` not found** – Install Miniconda or Anaconda and make sure ``conda``
   is on your ``PATH``.
 - **`yt-dlp` missing** – Install it inside the environment with

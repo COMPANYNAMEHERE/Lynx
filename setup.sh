@@ -62,31 +62,35 @@ conda run -n "$ENV_NAME" pip list
 # Install PyTorch matching the detected CUDA version
 echo "Detecting CUDA..."
 CUDA_VERSION=""
+GPU_DETECTED=0
 if command -v nvidia-smi >/dev/null 2>&1; then
     CUDA_VERSION=$(nvidia-smi | grep -o 'CUDA Version: [0-9.]*' | head -n1 | awk '{print $3}')
+    GPU_DETECTED=1
 fi
 if [ -z "$CUDA_VERSION" ] && command -v nvcc >/dev/null 2>&1; then
     CUDA_VERSION=$(nvcc --version | grep -o -E 'release [0-9]+\.[0-9]+' | head -n1 | awk '{print $2}')
+    GPU_DETECTED=1
 fi
 if [ -n "$CUDA_VERSION" ]; then
     echo "Found CUDA version $CUDA_VERSION"
 else
-    echo "No CUDA detected"
+    echo "No CUDA version detected"
 fi
 TORCH_TAG="cpu"
 if [ -n "$CUDA_VERSION" ]; then
     case "$CUDA_VERSION" in
         12.*) TORCH_TAG="cu121" ;;
         11.*) TORCH_TAG="cu118" ;;
+        10.*) TORCH_TAG="cu102" ;;
     esac
 fi
 
 if [ "$TORCH_TAG" = "cpu" ]; then
     echo "Installing CPU-only PyTorch..."
-    conda run -n "$ENV_NAME" pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu --progress-bar on
+    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cpu --progress-bar on
 else
     echo "Installing PyTorch for $TORCH_TAG..."
-    conda run -n "$ENV_NAME" pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG --progress-bar on
+    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG --progress-bar on
 fi
 
 # Optional check for outdated packages if environment already existed
@@ -106,13 +110,19 @@ fi
 PYTORCH_VERSION=$(conda run -n "$ENV_NAME" python -c "import torch,sys;sys.stdout.write(torch.__version__)")
 CUDA_AVAIL=$(conda run -n "$ENV_NAME" python -c "import torch,sys;sys.stdout.write('yes' if torch.cuda.is_available() else 'no')")
 
-echo -e "${green}All done!${reset} Activate the environment with:\n  conda activate $ENV_NAME"
-echo "Then launch the GUI with:\n  python main.py"
+echo -e "${green}All done!${reset}"
+echo "Next steps:"
+echo "  1. conda activate $ENV_NAME"
+echo "  2. python main.py"
 echo
 if [ "$CUDA_AVAIL" = "yes" ]; then
     echo -e "${green}PyTorch CUDA support detected.${reset}"
 else
     echo -e "${yellow}PyTorch reports no CUDA support.${reset}"
+    if [ $GPU_DETECTED -eq 1 ] && [ "$TORCH_TAG" != "cpu" ]; then
+        echo "Reinstall with CUDA via:"
+        echo "  conda run -n $ENV_NAME pip install --force-reinstall torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG"
+    fi
 fi
 if command -v nvidia-smi >/dev/null 2>&1 || command -v nvcc >/dev/null 2>&1; then
     echo -e "${green}GPU hardware detected on your system.${reset}"
