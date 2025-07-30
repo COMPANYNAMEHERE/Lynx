@@ -52,6 +52,15 @@ python tests/tester.py
 
 ## Troubleshooting
 
-If you encounter `ModuleNotFoundError: torchvision.transforms.functional_tensor`,
-the package includes a shim that loads automatically. Ensure you import
-``lynx`` before using Real-ESRGAN modules so the patch can take effect.
+Common issues:
+
+- **Missing torchvision functional_tensor** – Import ``lynx`` first so the included
+  shim can patch torchvision automatically.
+- **GPU detected but PyTorch CPU-only** – Rerun ``setup/setup.sh`` or reinstall
+  PyTorch with CUDA support.
+- **`conda` not found** – Install Miniconda or Anaconda and make sure ``conda``
+  is on your ``PATH``.
+- **`yt-dlp` missing** – Install it inside the environment with
+  ``pip install yt-dlp``.
+- **FFmpeg not detected** – Install FFmpeg with NVENC support and ensure it is
+  available on your ``PATH``.
