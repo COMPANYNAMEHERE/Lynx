@@ -7,13 +7,22 @@ REPO_DIR="$SCRIPT_DIR"
 LOG_FILE="$SCRIPT_DIR/setup/setup.log"
 ENV_NAME="${1:-lynx}"
 
-# Colours
-bold=$(tput bold)
-red=$(tput setaf 1)
-green=$(tput setaf 2)
-yellow=$(tput setaf 3)
-blue=$(tput setaf 4)
-reset=$(tput sgr0)
+# Colours (fall back to empty strings if tput is unavailable)
+bold=$(tput bold 2>/dev/null || true)
+red=$(tput setaf 1 2>/dev/null || true)
+green=$(tput setaf 2 2>/dev/null || true)
+yellow=$(tput setaf 3 2>/dev/null || true)
+blue=$(tput setaf 4 2>/dev/null || true)
+reset=$(tput sgr0 2>/dev/null || true)
+
+# Abort handler to print a helpful message
+trap 'echo "${red}Setup failed - check $LOG_FILE for details${reset}"' ERR
+
+# Ensure conda is available early
+if ! command -v conda >/dev/null 2>&1; then
+    echo "${red}conda not found. Please install Miniconda or Anaconda and ensure 'conda' is on your PATH.${reset}"
+    exit 1
+fi
 
 # Log everything to stdout and the log file
 mkdir -p "$(dirname "$LOG_FILE")"
