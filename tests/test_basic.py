@@ -87,5 +87,13 @@ class TestHelpers(unittest.TestCase):
         shutil.rmtree(dld)
         shutil.rmtree(tmp)
 
+    def test_cli_parse_args(self):
+        from lynx.cli import parse_args
+
+        args = parse_args(["in.mp4", "-o", "out.mp4", "--width", "1280"])
+        self.assertEqual(args.input, "in.mp4")
+        self.assertEqual(args.output, "out.mp4")
+        self.assertEqual(args.width, 1280)
+
 if __name__ == '__main__':
     unittest.main()

@@ -16,4 +16,5 @@ __all__ = [
     "encode",
     "processor",
     "gui",
+    "cli",
 ]

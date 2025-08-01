@@ -20,6 +20,11 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
    python main.py
    ```
    The window shows a status box indicating whether CUDA and the required weights are detected. If you see "GPU detected but PyTorch CPU-only" follow the reinstall notes below.
+4. For headless use, run the CLI:
+   ```bash
+   python -m lynx.cli -h
+   ```
+   The CLI accepts the same options as the GUI.
 
 ## Directory layout
 
