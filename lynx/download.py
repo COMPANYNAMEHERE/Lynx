@@ -6,6 +6,10 @@ import re
 from pathlib import Path
 from typing import Callable, Optional
 
+from .logger import get_logger
+
+logger = get_logger()
+
 
 def is_url(s: str) -> bool:
     """Return True if the string looks like an HTTP/HTTPS URL."""
@@ -24,8 +28,13 @@ def yt_download(
     downloads_dir.mkdir(parents=True, exist_ok=True)
     temp_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.info("Starting yt_download: %s", url)
+
+    orig_tmp = os.environ.get("TMP")
+    orig_temp = os.environ.get("TEMP")
     os.environ["TMP"] = str(temp_dir)
     os.environ["TEMP"] = str(temp_dir)
+    logger.debug("Set TMP/TEMP to %s", temp_dir)
 
     try:
         from yt_dlp import YoutubeDL
@@ -61,16 +70,28 @@ def yt_download(
         "progress_hooks": [hook],
     }
 
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        base = ydl.prepare_filename(info)
-        final = Path(base).with_suffix(".mkv")
-        if not final.exists():
-            alt = Path(base)
-            if alt.exists():
-                final = alt
-        if not final.exists():
-            raise RuntimeError("Download succeeded but final file not found.")
-        if log_cb:
-            log_cb(f"Downloaded: {final.name}")
-        return final.resolve()
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            base = ydl.prepare_filename(info)
+            final = Path(base).with_suffix(".mkv")
+            if not final.exists():
+                alt = Path(base)
+                if alt.exists():
+                    final = alt
+            if not final.exists():
+                raise RuntimeError("Download succeeded but final file not found.")
+            if log_cb:
+                log_cb(f"Downloaded: {final.name}")
+            logger.info("Downloaded video: %s", final)
+            return final.resolve()
+    finally:
+        if orig_tmp is None:
+            os.environ.pop("TMP", None)
+        else:
+            os.environ["TMP"] = orig_tmp
+        if orig_temp is None:
+            os.environ.pop("TEMP", None)
+        else:
+            os.environ["TEMP"] = orig_temp
+        logger.debug("Restored TMP/TEMP environment variables")

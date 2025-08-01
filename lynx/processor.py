@@ -64,8 +64,16 @@ class Processor:
             raise RuntimeError("FFmpeg not found in PATH. Install it and add ffmpeg/bin to PATH.")
 
         self._log("Checking GPU runtime…")
-        if not torch.cuda.is_available():
-            self._log("⚠ CUDA not detected. Will run on CPU (slow).")
+        if torch.cuda.is_available():
+            self._log(f"CUDA available (PyTorch {torch.version.cuda})")
+        else:
+            from .env import detect_gpu_info
+
+            info = detect_gpu_info()
+            if info:
+                self._log(f"⚠ GPU detected ({info}) but PyTorch lacks CUDA support. Running on CPU.")
+            else:
+                self._log("⚠ No GPU detected. Running on CPU.")
 
         workdir = Path(cfg["workdir"])
         downloads_dir = workdir / "downloads"

@@ -25,5 +25,6 @@ weights/
 weights/**/*.pth
 logs/
 *.log
+!setup/setup.log
 .conda/
 options/

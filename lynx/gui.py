@@ -299,7 +299,13 @@ class MainWindow(QtWidgets.QMainWindow):
         if torch.cuda.is_available():
             lines.append("CUDA: available")
         else:
-            lines.append("CUDA: not detected (CPU mode)")
+            from .env import detect_gpu_info
+
+            info = detect_gpu_info()
+            if info:
+                lines.append("CUDA: GPU detected but PyTorch CPU-only")
+            else:
+                lines.append("CUDA: not detected (CPU mode)")
 
         weights_dir = Path(self.opts.get("weights_dir", DEFAULTS["weights_dir"]))
         model = weights_dir / "RealESRGAN_x4plus.pth"

@@ -7,19 +7,24 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
 
 ## Quick start
 
-1. Install Python 3.11 and PyTorch with CUDA support.
-2. Create a conda environment and install the requirements using the helper script:
+1. Install Python 3.11. The setup script installs PyTorch for your detected CUDA
+   version using the official CUDA wheels.
+2. Run the setup script and follow the prompts to create or update the conda environment.  When it finishes it prints the exact commands to run next:
    ```bash
    bash setup.sh
    ```
-   Activate it with `conda activate lynx`.
-3. Run the GUI:
+   The log of all actions is saved to `setup/setup.log` for troubleshooting.
+3. Activate the environment and start the GUI:
    ```bash
+   conda activate lynx
    python main.py
    ```
-   On launch the window shows a status box indicating whether CUDA and
-   required weights are detected. If something is missing, follow the
-   instructions in the log output.
+   The window shows a status box indicating whether CUDA and the required weights are detected. If you see "GPU detected but PyTorch CPU-only" follow the reinstall notes below.
+4. For headless use, run the CLI:
+   ```bash
+   python -m lynx.cli -h
+   ```
+   The CLI accepts the same options as the GUI.
 
 ## Directory layout
 
@@ -30,6 +35,8 @@ These folders are created for you and kept in version control as placeholders:
   - `work/downloads/` – YouTube downloads.
   - `work/temp/` – transient files cleaned after each run.
 - `outputs/` – final encoded videos.
+- `setup.sh` – creates/updates the conda environment and installs PyTorch.
+- `setup/` – contains `setup.log`.
 - `logs/` – legacy location for run logs. Recent versions store logs under
   the user's OS data directory (e.g. `~/.local/state/lynx/logs` or
   `%LOCALAPPDATA%\Lynx\logs`).
@@ -48,6 +55,18 @@ python tests/tester.py
 
 ## Troubleshooting
 
-If you encounter `ModuleNotFoundError: torchvision.transforms.functional_tensor`,
-the package includes a shim that loads automatically. Ensure you import
-``lynx`` before using Real-ESRGAN modules so the patch can take effect.
+Common issues:
+
+- **Missing torchvision functional_tensor** – Import ``lynx`` first so the included
+  shim can patch torchvision automatically.
+- **GPU detected but PyTorch CPU-only** – Rerun ``setup.sh``. If it still installs
+  the CPU build, reinstall manually for your CUDA version, e.g.:
+  ```bash
+  conda run -n lynx pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu118
+  ```
+- **`conda` not found** – Install Miniconda or Anaconda and make sure ``conda``
+  is on your ``PATH``.
+- **`yt-dlp` missing** – Install it inside the environment with
+  ``pip install yt-dlp``.
+- **FFmpeg not detected** – Install FFmpeg with NVENC support and ensure it is
+  available on your ``PATH``.
