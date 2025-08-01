@@ -19,7 +19,7 @@ import torch
 from .download import is_url, yt_download
 from .encode import run_ffmpeg_encode
 from .models import ensure_model
-from .upscale import build_upsampler, pick_model
+from .upscale import build_upsampler, pick_model_by_quality
 from .logger import get_logger
 
 logger = get_logger()
@@ -120,20 +120,19 @@ class Processor:
         weights_dir = Path(cfg["weights_dir"])
         if cfg.get("prefetch_models"):
             self._log("Prefetching models…")
-            ensure_model(
-                weights_dir,
-                "RealESRGAN_x2plus.pth",
-                strict_hash=cfg.get("strict_model_hash", False),
-                progress_cb=lambda d, t: self._set_bar("download", d, t or 1),
-                log_cb=self._log,
-            )
-            ensure_model(
-                weights_dir,
-                "RealESRGAN_x4plus.pth",
-                strict_hash=cfg.get("strict_model_hash", False),
-                progress_cb=lambda d, t: self._set_bar("download", d, t or 1),
-                log_cb=self._log,
-            )
+            for fname in [
+                "realesr-general-x4v3.pth",
+                "Swin2SR_ClassicalSR_X4_64.pth",
+                "Real_HAT_GAN_SRx4_sharper.pth",
+                "net_params_200.pkl",
+            ]:
+                ensure_model(
+                    weights_dir,
+                    fname,
+                    strict_hash=cfg.get("strict_model_hash", False),
+                    progress_cb=lambda d, t: self._set_bar("download", d, t or 1),
+                    log_cb=self._log,
+                )
 
         def frames_iter():
             fidx = 0
@@ -166,7 +165,9 @@ class Processor:
                 log_cb=self._log,
             )
         else:
-            model_file, base_scale = pick_model(target_scale)
+            model_file, base_scale = pick_model_by_quality(
+                cfg.get("model_quality", "normal")
+            )
             model_path = ensure_model(
                 weights_dir,
                 model_file,
@@ -180,6 +181,7 @@ class Processor:
                 base_scale,
                 cfg["tile"],
                 fp16=(device == "cuda" and cfg.get("use_fp16", False)),
+                quality=cfg.get("model_quality", "normal"),
             )
             if device != "cuda":
                 self._log("⚠ Running on CPU; this will be slow.")

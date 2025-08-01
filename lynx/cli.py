@@ -42,6 +42,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--keep-temps", action="store_true", default=DEFAULTS["keep_temps"], help="keep temporary files")
     p.add_argument("--no-prefetch", dest="prefetch_models", action="store_false", default=DEFAULTS["prefetch_models"], help="skip model download")
     p.add_argument("--strict-model-hash", action="store_true", default=DEFAULTS["strict_model_hash"], help="fail on weight checksum mismatch")
+    p.add_argument("--quality", choices=["quick", "normal", "better", "best"], default=DEFAULTS["model_quality"], help="quality level")
     return p.parse_args(argv)
 
 
@@ -63,6 +64,7 @@ def main(argv: list[str] | None = None) -> None:
         "keep_temps": args.keep_temps,
         "prefetch_models": args.prefetch_models,
         "strict_model_hash": args.strict_model_hash,
+        "model_quality": args.quality,
     }
     hooks = CLIHooks()
     proc = Processor(hooks)

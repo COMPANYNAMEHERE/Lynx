@@ -35,6 +35,7 @@ DEFAULTS: Dict[str, Any] = {
     "keep_temps": False,
     "prefetch_models": True,
     "strict_model_hash": False,
+    "model_quality": "normal",
 }
 
 
@@ -53,7 +54,11 @@ def _validate(data: Dict[str, Any]) -> Dict[str, Any]:
                 clean[key] = val
         else:
             if isinstance(val, str) and val:
-                clean[key] = val
+                if key == "model_quality":
+                    if val in {"quick", "normal", "better", "best"}:
+                        clean[key] = val
+                else:
+                    clean[key] = val
     return clean
 
 

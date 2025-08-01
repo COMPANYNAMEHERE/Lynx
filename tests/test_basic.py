@@ -2,9 +2,9 @@ import unittest
 from pathlib import Path
 from lynx.download import is_url
 try:
-    from lynx.upscale import pick_model
+    from lynx.upscale import pick_model_by_quality
 except Exception:  # missing heavy deps
-    pick_model = None  # type: ignore
+    pick_model_by_quality = None  # type: ignore
 from lynx.models import _sha256_of_file
 
 class TestHelpers(unittest.TestCase):
@@ -12,11 +12,11 @@ class TestHelpers(unittest.TestCase):
         self.assertTrue(is_url('https://example.com/video'))
         self.assertFalse(is_url('/local/path.mp4'))
 
-    def test_pick_model(self):
-        if pick_model is None:
+    def test_pick_model_by_quality(self):
+        if pick_model_by_quality is None:
             self.skipTest('RealESRGAN dependencies missing')
-        self.assertEqual(pick_model(1.5), ('RealESRGAN_x2plus.pth', 2))
-        self.assertEqual(pick_model(4.0), ('RealESRGAN_x4plus.pth', 4))
+        self.assertEqual(pick_model_by_quality('quick'), ('realesr-general-x4v3.pth', 4))
+        self.assertEqual(pick_model_by_quality('normal'), ('Swin2SR_ClassicalSR_X4_64.pth', 4))
 
     def test_sha256_of_file(self):
         tmp = Path('tests/tmp.txt')
@@ -90,10 +90,11 @@ class TestHelpers(unittest.TestCase):
     def test_cli_parse_args(self):
         from lynx.cli import parse_args
 
-        args = parse_args(["in.mp4", "-o", "out.mp4", "--width", "1280"])
+        args = parse_args(["in.mp4", "-o", "out.mp4", "--width", "1280", "--quality", "better"])
         self.assertEqual(args.input, "in.mp4")
         self.assertEqual(args.output, "out.mp4")
         self.assertEqual(args.width, 1280)
+        self.assertEqual(args.quality, "better")
 
 if __name__ == '__main__':
     unittest.main()

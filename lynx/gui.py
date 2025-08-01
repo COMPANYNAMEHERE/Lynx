@@ -211,6 +211,13 @@ class MainWindow(QtWidgets.QMainWindow):
         form_out.addWidget(btn_out)
         btn_out.clicked.connect(self.browse_output)
 
+        quality_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(quality_row)
+        self.btn_quality = QtWidgets.QPushButton()
+        self._init_quality_button()
+        quality_row.addWidget(QtWidgets.QLabel("Quality"))
+        quality_row.addWidget(self.btn_quality)
+
         self.bar_dl = QtWidgets.QProgressBar()
         self.bar_dl.setRange(0, 100)
         self.bar_dl.setValue(0)
@@ -280,7 +287,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def apply_options(self) -> None:
         self.ed_out.setText(self.opts.get("output", DEFAULTS["output"]))
+        self.btn_quality.setText(self.opts.get("model_quality", DEFAULTS["model_quality"]).title())
         self.update_status_box()
+
+    def _init_quality_button(self) -> None:
+        quality = self.opts.get("model_quality", DEFAULTS["model_quality"])
+        self.btn_quality.setText(quality.title())
+        menu = QtWidgets.QMenu(self.btn_quality)
+        for name in ["quick", "normal", "better", "best"]:
+            act = menu.addAction(name.title())
+            act.triggered.connect(lambda _=False, n=name: self.set_quality(n))
+        self.btn_quality.setMenu(menu)
+
+    def set_quality(self, quality: str) -> None:
+        self.opts["model_quality"] = quality
+        self.btn_quality.setText(quality.title())
+        save_options(self.opts)
 
     def update_status_box(self) -> None:
         """Check environment and display status messages."""
