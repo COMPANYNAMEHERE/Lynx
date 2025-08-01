@@ -9,11 +9,11 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
 
 1. Install Python 3.11. The setup script installs PyTorch for your detected CUDA
    version using the official CUDA wheels.
-2. Run the setup script and follow the prompts to create or update the conda environment.  When it finishes it prints the exact commands to run next:
+2. Run the setup script and follow the prompts to create or update the conda environment.  When resetting an existing environment you can choose to redownload all packages.  Each package installs with its own progress display.  When it finishes it prints the exact commands to run next:
    ```bash
    bash setup.sh
    ```
-   The log of all actions is saved to `setup/setup.log` for troubleshooting.
+   The log of all actions is saved to `setup/setup.log` for troubleshooting (git ignores this file by default).
 3. Activate the environment and start the GUI:
    ```bash
    conda activate lynx
