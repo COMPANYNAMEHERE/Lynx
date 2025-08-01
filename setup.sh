@@ -109,11 +109,16 @@ fi
 # Optional check for outdated packages if environment already existed
 if [ "$CREATE_ENV" -eq 0 ]; then
     echo "Checking for outdated packages..."
-    OUTDATED=$(conda run -n "$ENV_NAME" pip list --outdated --format=freeze)
+    OUTDATED=$(conda run -n "$ENV_NAME" python - <<'PY'
+import json, subprocess
+pkgs=json.loads(subprocess.check_output(["pip", "list", "--outdated", "--format=json"]))
+print(" ".join(p["name"] for p in pkgs))
+PY
+    )
     if [ -n "$OUTDATED" ]; then
-        echo "$OUTDATED" | while IFS= read -r line; do echo " - $line"; done
+        echo "$OUTDATED" | tr ' ' '\n' | while IFS= read -r line; do echo " - $line"; done
         echo "Updating outdated packages..."
-        conda run -n "$ENV_NAME" pip install -U $(echo "$OUTDATED" | cut -d= -f1 | tr '\n' ' ') --quiet
+        conda run -n "$ENV_NAME" pip install -U $OUTDATED --quiet
         conda run -n "$ENV_NAME" pip list
     else
         echo "All packages up to date."
