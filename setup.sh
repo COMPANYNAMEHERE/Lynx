@@ -19,8 +19,6 @@ reset=$(tput sgr0)
 mkdir -p "$(dirname "$LOG_FILE")"
 echo "${bold}Logging to $LOG_FILE${reset}"
 exec > >(tee -a "$LOG_FILE") 2>&1
-set -x
-echo "Running $0 $*"
 
 cat <<EOF
 ${bold}${blue}This script will create or update the conda environment '$ENV_NAME'.${reset}
@@ -56,7 +54,8 @@ else
 fi
 
 echo "Installing/updating requirements from $REPO_DIR/requirements.txt..."
-conda run -n "$ENV_NAME" pip install -r "$REPO_DIR/requirements.txt" -U --progress-bar on
+echo "Installing Python packages..."
+conda run -n "$ENV_NAME" pip install -r "$REPO_DIR/requirements.txt" -U --quiet
 conda run -n "$ENV_NAME" pip list
 
 # Install PyTorch matching the detected CUDA version
@@ -87,10 +86,10 @@ fi
 
 if [ "$TORCH_TAG" = "cpu" ]; then
     echo "Installing CPU-only PyTorch..."
-    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cpu --progress-bar on
+    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet
 else
     echo "Installing PyTorch for $TORCH_TAG..."
-    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG --progress-bar on
+    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/$TORCH_TAG --quiet
 fi
 
 # Optional check for outdated packages if environment already existed
@@ -100,7 +99,7 @@ if [ "$CREATE_ENV" -eq 0 ]; then
     if [ -n "$OUTDATED" ]; then
         echo "$OUTDATED" | while IFS= read -r line; do echo " - $line"; done
         echo "Updating outdated packages..."
-        conda run -n "$ENV_NAME" pip install -U $(echo "$OUTDATED" | cut -d= -f1 | tr '\n' ' ') --progress-bar on
+        conda run -n "$ENV_NAME" pip install -U $(echo "$OUTDATED" | cut -d= -f1 | tr '\n' ' ') --quiet
         conda run -n "$ENV_NAME" pip list
     else
         echo "All packages up to date."
@@ -121,7 +120,7 @@ else
     echo -e "${yellow}PyTorch reports no CUDA support.${reset}"
     if [ $GPU_DETECTED -eq 1 ] && [ "$TORCH_TAG" != "cpu" ]; then
         echo "Reinstall with CUDA via:"
-        echo "  conda run -n $ENV_NAME pip install --force-reinstall torch torchvision --extra-index-url https://download.pytorch.org/whl/$TORCH_TAG"
+        echo "  conda run -n $ENV_NAME pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/$TORCH_TAG"
     fi
 fi
 if command -v nvidia-smi >/dev/null 2>&1 || command -v nvcc >/dev/null 2>&1; then

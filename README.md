@@ -7,8 +7,8 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
 
 ## Quick start
 
-1. Install Python 3.11. PyTorch will be installed automatically by the setup script.
-   The script detects CUDA via `nvidia-smi` or `nvcc` and installs the matching build.
+1. Install Python 3.11. The setup script installs PyTorch for your detected CUDA
+   version using the official CUDA wheels.
 2. Run the setup script and follow the prompts to create or update the conda environment.  When it finishes it prints the exact commands to run next:
    ```bash
    bash setup.sh
@@ -57,7 +57,7 @@ Common issues:
 - **GPU detected but PyTorch CPU-only** – Rerun ``setup.sh``. If it still installs
   the CPU build, reinstall manually for your CUDA version, e.g.:
   ```bash
-  conda run -n lynx pip install --force-reinstall torch torchvision --extra-index-url https://download.pytorch.org/whl/cu118
+  conda run -n lynx pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu118
   ```
 - **`conda` not found** – Install Miniconda or Anaconda and make sure ``conda``
   is on your ``PATH``.
