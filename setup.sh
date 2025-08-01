@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$SCRIPT_DIR"
 LOG_FILE="$SCRIPT_DIR/setup/setup.log"
 ENV_NAME="${1:-lynx}"
+NO_CACHE=0
 
 # Colours (fall back to empty strings if tput is unavailable)
 bold=$(tput bold 2>/dev/null || true)
@@ -54,6 +55,10 @@ if conda env list | awk '{print $1}' | grep -Fxq "$ENV_NAME"; then
     if [[ $resp =~ ^[yY] ]]; then
         echo "Removing existing environment..."
         conda env remove -n "$ENV_NAME" -y
+        read -rp "Redownload packages as well? [y/N] " dl
+        if [[ $dl =~ ^[yY] ]]; then
+            NO_CACHE=1
+        fi
         echo "Creating conda environment '$ENV_NAME'..."
         conda create -n "$ENV_NAME" python=3.11 -y
         CREATE_ENV=1
@@ -69,7 +74,13 @@ fi
 
 echo "Installing/updating requirements from $REPO_DIR/requirements.txt..."
 echo "Installing Python packages..."
-conda run -n "$ENV_NAME" pip install -r "$REPO_DIR/requirements.txt" -U --quiet
+while IFS= read -r pkg; do
+    pkg="${pkg%%#*}"
+    pkg="$(echo "$pkg" | xargs)"
+    [ -z "$pkg" ] && continue
+    echo "${blue}Installing $pkg${reset}"
+    conda run -n "$ENV_NAME" pip install ${NO_CACHE:+--no-cache-dir} -U "$pkg" --progress-bar on
+done < "$REPO_DIR/requirements.txt"
 conda run -n "$ENV_NAME" pip list
 
 # Install PyTorch matching the detected CUDA version
@@ -100,10 +111,10 @@ fi
 
 if [ "$TORCH_TAG" = "cpu" ]; then
     echo "Installing CPU-only PyTorch..."
-    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cpu --quiet
+    conda run -n "$ENV_NAME" pip install ${NO_CACHE:+--no-cache-dir} --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cpu --progress-bar on
 else
     echo "Installing PyTorch for $TORCH_TAG..."
-    conda run -n "$ENV_NAME" pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/$TORCH_TAG --quiet
+    conda run -n "$ENV_NAME" pip install ${NO_CACHE:+--no-cache-dir} --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/$TORCH_TAG --progress-bar on
 fi
 
 # Optional check for outdated packages if environment already existed
@@ -118,7 +129,7 @@ PY
     if [ -n "$OUTDATED" ]; then
         echo "$OUTDATED" | tr ' ' '\n' | while IFS= read -r line; do echo " - $line"; done
         echo "Updating outdated packages..."
-        conda run -n "$ENV_NAME" pip install -U $OUTDATED --quiet
+        conda run -n "$ENV_NAME" pip install ${NO_CACHE:+--no-cache-dir} -U $OUTDATED --progress-bar on
         conda run -n "$ENV_NAME" pip list
     else
         echo "All packages up to date."
