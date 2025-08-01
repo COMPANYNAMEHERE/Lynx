@@ -21,6 +21,7 @@ trap 'echo "${red}Setup failed - check $LOG_FILE for details${reset}"' ERR
 # Ensure conda is available early
 if ! command -v conda >/dev/null 2>&1; then
     echo "${red}conda not found. Please install Miniconda or Anaconda and ensure 'conda' is on your PATH.${reset}"
+    read -rp "Press Enter to exit" _
     exit 1
 fi
 
@@ -38,7 +39,11 @@ EOF
 read -rp "Continue? [y/N] " ans
 case "$ans" in
     [yY]*) ;;
-    *) echo "Aborted."; exit 1 ;;
+    *)
+        echo "Aborted."
+        read -rp "Press Enter to exit" _
+        exit 1
+        ;;
 esac
 
 echo "Checking existing environment..."
