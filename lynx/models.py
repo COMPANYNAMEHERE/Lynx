@@ -32,7 +32,7 @@ MODEL_SPECS = {
         "sha256": None,
     },
     "Real_HAT_GAN_SRx4_sharper.pth": {
-        "url": "https://huggingface.co/Acly/HAT/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
+        "url": "https://huggingface.co/Acly/hat/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
         "sha256": None,
     },
     "net_params_200.pkl": {
