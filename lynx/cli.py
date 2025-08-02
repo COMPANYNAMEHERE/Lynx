@@ -47,13 +47,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--cq", type=int, default=DEFAULTS["cq"], help="NVENC constant quality")
     p.add_argument("--codec", default=DEFAULTS["codec"], help="FFmpeg codec")
     p.add_argument("--preset", default=DEFAULTS["preset"], help="NVENC preset")
-    p.add_argument("--weights-dir", default=DEFAULTS["weights_dir"], help="Real-ESRGAN weights directory")
+    # folder containing model weight files (RealESRGAN, Swin2SR, HAT, AdcSR)
+    p.add_argument("--weights-dir", default=DEFAULTS["weights_dir"], help="model weights directory")
     p.add_argument("--workdir", default=DEFAULTS["workdir"], help="temporary working directory")
     p.add_argument("--fp16", action="store_true", default=DEFAULTS["use_fp16"], help="use fp16 upscaling")
     p.add_argument("--keep-temps", action="store_true", default=DEFAULTS["keep_temps"], help="keep temporary files")
     p.add_argument("--no-prefetch", dest="prefetch_models", action="store_false", default=DEFAULTS["prefetch_models"], help="skip model download")
     p.add_argument("--strict-model-hash", action="store_true", default=DEFAULTS["strict_model_hash"], help="fail on weight checksum mismatch")
-    p.add_argument("--quality", choices=["quick", "normal", "better", "best"], default=DEFAULTS["model_quality"], help="quality level")
+    # map human-friendly quality levels to specific model architectures
+    p.add_argument(
+        "--quality",
+        choices=["quick", "normal", "better", "best"],
+        default=DEFAULTS["model_quality"],
+        help=(
+            "select model quality: quick=RealESRGAN (fastest), "
+            "normal=Swin2SR, better=HAT, best=AdcSR"
+        ),
+    )
     return p.parse_args(argv)
 
 

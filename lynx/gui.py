@@ -245,6 +245,7 @@ class MainWindow(QtWidgets.QMainWindow):
         quality_row = QtWidgets.QHBoxLayout()
         layout.addLayout(quality_row)
         self.btn_quality = QtWidgets.QPushButton()
+        # allow user to pick one of four model quality tiers
         self._init_quality_button()
         quality_row.addWidget(QtWidgets.QLabel("Quality"))
         quality_row.addWidget(self.btn_quality)
@@ -322,15 +323,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_status_box()
 
     def _init_quality_button(self) -> None:
+        """Populate the quality picker menu with model descriptions."""
         quality = self.opts.get("model_quality", DEFAULTS["model_quality"])
         self.btn_quality.setText(quality.title())
+        # show mapping between friendly names and actual model architectures
+        self.btn_quality.setToolTip(
+            "quick=RealESRGAN, normal=Swin2SR, better=HAT, best=AdcSR"
+        )
         menu = QtWidgets.QMenu(self.btn_quality)
-        for name in ["quick", "normal", "better", "best"]:
-            act = menu.addAction(name.title())
+        items = [
+            ("quick", "Quick – RealESRGAN"),
+            ("normal", "Normal – Swin2SR"),
+            ("better", "Better – HAT"),
+            ("best", "Best – AdcSR"),
+        ]
+        for name, label in items:
+            act = menu.addAction(label)
             act.triggered.connect(lambda _=False, n=name: self.set_quality(n))
         self.btn_quality.setMenu(menu)
 
     def set_quality(self, quality: str) -> None:
+        """Store chosen model quality tier and update button text."""
         self.opts["model_quality"] = quality
         self.btn_quality.setText(quality.title())
         save_options(self.opts)
