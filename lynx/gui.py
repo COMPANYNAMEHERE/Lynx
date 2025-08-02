@@ -215,7 +215,9 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("Lynx Upscaler")
         self.processor: Optional[Processor] = None
-        self.thread: Optional[QtCore.QThread] = None
+        # separate attribute name to avoid clashing with ``QObject.thread``
+        # and accidental shadowing of that method
+        self.proc_thread: Optional[QtCore.QThread] = None
         self.opts = load_options()
         logger.debug("Options loaded: %s", self.opts)
         self._init_ui()
@@ -474,22 +476,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_widget.clear()
         self.set_status("Starting…")
         self.processor = Processor(self)
-        self.thread = ProcessorThread(self.processor, cfg)
-        self.thread.finished.connect(self.processing_finished)
-        self.thread.start()
+        self.proc_thread = ProcessorThread(self.processor, cfg)
+        self.proc_thread.finished.connect(self.processing_finished)
+        self.proc_thread.start()
         logger.debug("Processing thread launched")
 
     def processing_finished(self) -> None:  # pragma: no cover - UI
         error = None
         out_file: Optional[Path] = None
-        if self.thread:
-            self.thread.wait()
-            error = self.thread.error
+        if self.proc_thread:
+            self.proc_thread.wait()
+            error = self.proc_thread.error
         if self.processor:
             path = getattr(self.processor, "output_path", None)
             if path:
                 out_file = Path(path)
-        self.thread = None
+        self.proc_thread = None
         self.processor = None
         self.bar_dl.setRange(0, 100)
         self.bar_dl.setValue(0)
@@ -521,8 +523,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.processor.cancel()
             self.set_status("Cancelling…")
             logger.info("Cancel requested")
-            if self.thread:
-                self.thread.wait()
+            if self.proc_thread:
+                self.proc_thread.wait()
         self.btn_cancel.setEnabled(False)
         self.btn_start.setEnabled(True)
         self.bar_dl.setRange(0, 100)
@@ -533,8 +535,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
         if self.processor:
             self.processor.cancel()
-            if self.thread:
-                self.thread.wait()
+            if self.proc_thread:
+                self.proc_thread.wait()
         event.accept()
 
 
