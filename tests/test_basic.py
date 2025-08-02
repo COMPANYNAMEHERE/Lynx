@@ -17,6 +17,8 @@ class TestHelpers(unittest.TestCase):
             self.skipTest('RealESRGAN dependencies missing')
         self.assertEqual(pick_model_by_quality('quick'), ('realesr-general-x4v3.pth', 4))
         self.assertEqual(pick_model_by_quality('normal'), ('Swin2SR_ClassicalSR_X4_64.pth', 4))
+        self.assertEqual(pick_model_by_quality('better'), ('Real_HAT_GAN_SRx4_sharper.pth', 4))
+        self.assertEqual(pick_model_by_quality('best'), ('net_params_200.pkl', 4))
 
     def test_sha256_of_file(self):
         tmp = Path('tests/tmp.txt')

@@ -28,49 +28,24 @@ MODEL_SPECS = {
 MODEL_SPECS.update(
     {
         "realesr-general-x4v3.pth": {
-            "url": (
-                "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/"
-                "realesr-general-x4v3.pth"
-            ),
-            "backup_url": (
-                "https://cdn-lfs.huggingface.co/jhj0517/realesr-general-x4v3/sha256/"
-                "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292?"
-                "download=true&name=realesr-general-x4v3.pth"
-            ),
-            "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+            "backup_url": "https://resources.trumanwl.com/models/upscale_models/realesr-general-x4v3.pth",
+            "sha256": None,
         },
         "Swin2SR_ClassicalSR_X4_64.pth": {
-            "url": (
-                "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/"
-                "Swin2SR_ClassicalSR_X4_64.pth"
-            ),
-            "backup_url": (
-                "https://cdn-lfs.huggingface.co/uwg/upscaler/sha256/"
-                "9fef30c758897992581f6b3ae7802bea246bc56d88dd36403d377d8dcf47a173?"
-                "download=true&name=Swin2SR_ClassicalSR_X4_64.pth"
-            ),
-            "sha256": "9fef30c758897992581f6b3ae7802bea246bc56d88dd36403d377d8dcf47a173",
+            "url": "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/Swin2SR_ClassicalSR_X4_64.pth",
+            "backup_url": "https://huggingface.co/caidas/swin2SR-classical-sr-x4-64/resolve/main/pytorch_model.bin",
+            "sha256": None,
         },
         "Real_HAT_GAN_SRx4_sharper.pth": {
             "url": "https://huggingface.co/Acly/hat/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
-            "backup_url": (
-                "https://cdn-lfs.huggingface.co/Acly/hat/sha256/"
-                "5800b67136006eb8cab3b4ed7c8d73b6a195bb18e6cc709b674f9aa069c00271?"
-                "download=true&name=Real_HAT_GAN_SRx4_sharper.pth"
-            ),
-            "sha256": "5800b67136006eb8cab3b4ed7c8d73b6a195bb18e6cc709b674f9aa069c00271",
+            "backup_url": "https://civitai.com/api/download/models/26825",
+            "sha256": None,
         },
         "net_params_200.pkl": {
-            "url": (
-                "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/weight/"
-                "net_params_200.pkl"
-            ),
-            "backup_url": (
-                "https://cdn-lfs.huggingface.co/Guaishou74851/AdcSR/sha256/"
-                "87fc2d3b2a007ebd568065f77b1a90fe6c10570408a38b7d72b28e6a16946111?"
-                "download=true&name=net_params_200.pkl"
-            ),
-            "sha256": "87fc2d3b2a007ebd568065f77b1a90fe6c10570408a38b7d72b28e6a16946111",
+            "url": "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/net_params_200.pkl",
+            "backup_url": "https://drive.google.com/uc?id=1c9Q4DkE9RM_UvYVDCQv1SSd5N8KuudAw",
+            "sha256": None,
         },
     }
 )
