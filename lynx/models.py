@@ -25,6 +25,56 @@ MODEL_SPECS = {
     },
 }
 
+MODEL_SPECS.update(
+    {
+        "realesr-general-x4v3.pth": {
+            "url": (
+                "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/"
+                "realesr-general-x4v3.pth"
+            ),
+            "backup_url": (
+                "https://cdn-lfs.huggingface.co/jhj0517/realesr-general-x4v3/sha256/"
+                "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292?"
+                "download=true&name=realesr-general-x4v3.pth"
+            ),
+            "sha256": "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292",
+        },
+        "Swin2SR_ClassicalSR_X4_64.pth": {
+            "url": (
+                "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/"
+                "Swin2SR_ClassicalSR_X4_64.pth"
+            ),
+            "backup_url": (
+                "https://cdn-lfs.huggingface.co/uwg/upscaler/sha256/"
+                "9fef30c758897992581f6b3ae7802bea246bc56d88dd36403d377d8dcf47a173?"
+                "download=true&name=Swin2SR_ClassicalSR_X4_64.pth"
+            ),
+            "sha256": "9fef30c758897992581f6b3ae7802bea246bc56d88dd36403d377d8dcf47a173",
+        },
+        "Real_HAT_GAN_SRx4_sharper.pth": {
+            "url": "https://huggingface.co/Acly/hat/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
+            "backup_url": (
+                "https://cdn-lfs.huggingface.co/Acly/hat/sha256/"
+                "5800b67136006eb8cab3b4ed7c8d73b6a195bb18e6cc709b674f9aa069c00271?"
+                "download=true&name=Real_HAT_GAN_SRx4_sharper.pth"
+            ),
+            "sha256": "5800b67136006eb8cab3b4ed7c8d73b6a195bb18e6cc709b674f9aa069c00271",
+        },
+        "net_params_200.pkl": {
+            "url": (
+                "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/weight/"
+                "net_params_200.pkl"
+            ),
+            "backup_url": (
+                "https://cdn-lfs.huggingface.co/Guaishou74851/AdcSR/sha256/"
+                "87fc2d3b2a007ebd568065f77b1a90fe6c10570408a38b7d72b28e6a16946111?"
+                "download=true&name=net_params_200.pkl"
+            ),
+            "sha256": "87fc2d3b2a007ebd568065f77b1a90fe6c10570408a38b7d72b28e6a16946111",
+        },
+    }
+)
+
 
 def _sha256_of_file(path: Path, bufsize: int = 1024 * 1024) -> str:
     h = hashlib.sha256()
@@ -129,13 +179,30 @@ def ensure_model(
             dest.unlink(missing_ok=True)
 
     if not dest.exists():
-        _download_with_progress(
-            spec["url"],
-            dest,
-            expected_sha256=spec.get("sha256"),
-            strict=strict_hash,
-            progress_cb=progress_cb,
-            log_cb=log_cb,
-            cancel_event=cancel_event,
-        )
+        try:
+            _download_with_progress(
+                spec["url"],
+                dest,
+                expected_sha256=spec.get("sha256"),
+                strict=strict_hash,
+                progress_cb=progress_cb,
+                log_cb=log_cb,
+                cancel_event=cancel_event,
+            )
+        except Exception as exc:
+            backup = spec.get("backup_url")
+            if not backup:
+                raise
+            logger.warning("Primary URL failed for %s: %s", model_filename, exc)
+            if log_cb:
+                log_cb("Primary download failed, trying backup…")
+            _download_with_progress(
+                backup,
+                dest,
+                expected_sha256=spec.get("sha256"),
+                strict=strict_hash,
+                progress_cb=progress_cb,
+                log_cb=log_cb,
+                cancel_event=cancel_event,
+            )
     return dest
