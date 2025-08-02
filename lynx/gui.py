@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -208,6 +209,7 @@ class MainWindow(QtWidgets.QMainWindow):
     log_signal = QtCore.pyqtSignal(str)
     progress_signal = QtCore.pyqtSignal(str, int, int)
     status_signal = QtCore.pyqtSignal(str)
+    overwrite_request = QtCore.pyqtSignal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -217,6 +219,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.opts = load_options()
         logger.debug("Options loaded: %s", self.opts)
         self._init_ui()
+        self.overwrite_request.connect(self._on_overwrite_request)
+        self._overwrite_event = threading.Event()
+        self._overwrite_answer = False
 
     # UI construction
     def _init_ui(self) -> None:
@@ -408,15 +413,26 @@ class MainWindow(QtWidgets.QMainWindow):
     def set_status(self, msg: str) -> None:
         self.status_signal.emit(msg)
 
+    @QtCore.pyqtSlot(str)
+    def _on_overwrite_request(self, path: str) -> None:
+        ans = QtWidgets.QMessageBox.question(
+            self, "Overwrite file", f"{path} exists. Overwrite?"
+        ) == QtWidgets.QMessageBox.Yes
+        self._overwrite_answer = ans
+        self._overwrite_event.set()
+
     def confirm_overwrite(self, path: str) -> bool:
-        return (
-            QtWidgets.QMessageBox.question(
-                self,
-                "Overwrite file",
-                f"{path} exists. Overwrite?",
+        if QtCore.QThread.currentThread() is self.thread():
+            return (
+                QtWidgets.QMessageBox.question(
+                    self, "Overwrite file", f"{path} exists. Overwrite?"
+                )
+                == QtWidgets.QMessageBox.Yes
             )
-            == QtWidgets.QMessageBox.Yes
-        )
+        self._overwrite_event.clear()
+        self.overwrite_request.emit(path)
+        self._overwrite_event.wait()
+        return bool(self._overwrite_answer)
 
     # Processing controls
     def collect_cfg(self) -> Optional[dict]:
