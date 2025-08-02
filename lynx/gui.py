@@ -54,6 +54,7 @@ class ProcessorThread(QtCore.QThread):
             self.proc.run(self.cfg)
         except Exception as e:
             self.error = e
+            logger.exception("Processing error")
 
 
 class OptionsDialog(QtWidgets.QDialog):
@@ -78,13 +79,38 @@ class OptionsDialog(QtWidgets.QDialog):
         form_enc = QtWidgets.QFormLayout(enc)
 
         self.ed_out = QtWidgets.QLineEdit(self.opts.get("output", DEFAULTS["output"]))
+        btn_out = QtWidgets.QPushButton("Browse")
+        row_out = QtWidgets.QHBoxLayout()
+        row_out.addWidget(self.ed_out)
+        row_out.addWidget(btn_out)
+        wrap_out = QtWidgets.QWidget()
+        wrap_out.setLayout(row_out)
+
         self.ed_weights = QtWidgets.QLineEdit(
             self.opts.get("weights_dir", DEFAULTS["weights_dir"])
         )
+        btn_weights = QtWidgets.QPushButton("Browse")
+        row_weights = QtWidgets.QHBoxLayout()
+        row_weights.addWidget(self.ed_weights)
+        row_weights.addWidget(btn_weights)
+        wrap_weights = QtWidgets.QWidget()
+        wrap_weights.setLayout(row_weights)
+
         self.ed_work = QtWidgets.QLineEdit(self.opts.get("workdir", DEFAULTS["workdir"]))
-        form_paths.addRow("Default output", self.ed_out)
-        form_paths.addRow("Weights folder", self.ed_weights)
-        form_paths.addRow("Work folder", self.ed_work)
+        btn_work = QtWidgets.QPushButton("Browse")
+        row_work = QtWidgets.QHBoxLayout()
+        row_work.addWidget(self.ed_work)
+        row_work.addWidget(btn_work)
+        wrap_work = QtWidgets.QWidget()
+        wrap_work.setLayout(row_work)
+
+        form_paths.addRow("Output folder", wrap_out)
+        form_paths.addRow("Weights folder", wrap_weights)
+        form_paths.addRow("Work folder", wrap_work)
+
+        btn_out.clicked.connect(lambda: self._pick_dir(self.ed_out))
+        btn_weights.clicked.connect(lambda: self._pick_dir(self.ed_weights))
+        btn_work.clicked.connect(lambda: self._pick_dir(self.ed_work))
 
         self.sp_w = QtWidgets.QSpinBox()
         self.sp_w.setRange(64, 16384)
@@ -152,6 +178,11 @@ class OptionsDialog(QtWidgets.QDialog):
         self.chk_prefetch.setChecked(bool(DEFAULTS["prefetch_models"]))
         self.chk_strict.setChecked(bool(DEFAULTS["strict_model_hash"]))
 
+    def _pick_dir(self, edit: QtWidgets.QLineEdit) -> None:
+        path = QtWidgets.QFileDialog.getExistingDirectory(self, "Select folder", edit.text())
+        if path:
+            edit.setText(path)
+
     def accept(self) -> None:  # pragma: no cover - UI
         self.opts["output"] = self.ed_out.text().strip()
         self.opts["weights_dir"] = self.ed_weights.text().strip()
@@ -211,6 +242,14 @@ class MainWindow(QtWidgets.QMainWindow):
         form_out.addWidget(btn_out)
         btn_out.clicked.connect(self.browse_output)
 
+        quality_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(quality_row)
+        self.btn_quality = QtWidgets.QPushButton()
+        # allow user to pick one of four model quality tiers
+        self._init_quality_button()
+        quality_row.addWidget(QtWidgets.QLabel("Quality"))
+        quality_row.addWidget(self.btn_quality)
+
         self.bar_dl = QtWidgets.QProgressBar()
         self.bar_dl.setRange(0, 100)
         self.bar_dl.setValue(0)
@@ -265,8 +304,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ed_in.setText(path)
 
     def browse_output(self) -> None:
-        path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save output as", str(Path("outputs") / "output.mp4"), "MP4 files (*.mp4)"
+        path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Select output folder", str(Path("outputs"))
         )
         if path:
             self.ed_out.setText(path)
@@ -280,7 +319,34 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def apply_options(self) -> None:
         self.ed_out.setText(self.opts.get("output", DEFAULTS["output"]))
+        self.btn_quality.setText(self.opts.get("model_quality", DEFAULTS["model_quality"]).title())
         self.update_status_box()
+
+    def _init_quality_button(self) -> None:
+        """Populate the quality picker menu with model descriptions."""
+        quality = self.opts.get("model_quality", DEFAULTS["model_quality"])
+        self.btn_quality.setText(quality.title())
+        # show mapping between friendly names and actual model architectures
+        self.btn_quality.setToolTip(
+            "quick=RealESRGAN, medium=Swin2SR, high=HAT, super=AdcSR"
+        )
+        menu = QtWidgets.QMenu(self.btn_quality)
+        items = [
+            ("quick", "Quick – RealESRGAN"),
+            ("medium", "Medium – Swin2SR"),
+            ("high", "High – HAT"),
+            ("super", "Super – AdcSR"),
+        ]
+        for name, label in items:
+            act = menu.addAction(label)
+            act.triggered.connect(lambda _=False, n=name: self.set_quality(n))
+        self.btn_quality.setMenu(menu)
+
+    def set_quality(self, quality: str) -> None:
+        """Store chosen model quality tier and update button text."""
+        self.opts["model_quality"] = quality
+        self.btn_quality.setText(quality.title())
+        save_options(self.opts)
 
     def update_status_box(self) -> None:
         """Check environment and display status messages."""
@@ -342,6 +408,16 @@ class MainWindow(QtWidgets.QMainWindow):
     def set_status(self, msg: str) -> None:
         self.status_signal.emit(msg)
 
+    def confirm_overwrite(self, path: str) -> bool:
+        return (
+            QtWidgets.QMessageBox.question(
+                self,
+                "Overwrite file",
+                f"{path} exists. Overwrite?",
+            )
+            == QtWidgets.QMessageBox.Yes
+        )
+
     # Processing controls
     def collect_cfg(self) -> Optional[dict]:
         inp = self.ed_in.text().strip()
@@ -352,7 +428,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ok = False
         else:
             self.ed_in.setStyleSheet("")
-        if not out or not Path(out).parent.exists():
+        if not out:
             self.ed_out.setStyleSheet("border: 1px solid red;")
             ok = False
         else:
@@ -388,8 +464,15 @@ class MainWindow(QtWidgets.QMainWindow):
         logger.debug("Processing thread launched")
 
     def processing_finished(self) -> None:  # pragma: no cover - UI
+        error = None
+        out_file: Optional[Path] = None
         if self.thread:
             self.thread.wait()
+            error = self.thread.error
+        if self.processor:
+            path = getattr(self.processor, "output_path", None)
+            if path:
+                out_file = Path(path)
         self.thread = None
         self.processor = None
         self.bar_dl.setRange(0, 100)
@@ -398,10 +481,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bar_proc.setValue(0)
         self.btn_start.setEnabled(True)
         self.btn_cancel.setEnabled(False)
-        if self.status_label.text().startswith("Cancelling"):
+        if error:
+            QtWidgets.QMessageBox.critical(self, "Error", str(error))
+            logger.error("Processing failed: %s", error)
+            self.set_status("Error")
+        elif self.status_label.text().startswith("Cancelling"):
             self.set_status("Cancelled")
         else:
             self.set_status("Finished")
+            if out_file:
+                ans = QtWidgets.QMessageBox.question(
+                    self,
+                    "Open folder",
+                    f"Open output folder?\n{out_file.parent}",
+                )
+                if ans == QtWidgets.QMessageBox.Yes:
+                    QtGui.QDesktopServices.openUrl(
+                        QtCore.QUrl.fromLocalFile(str(out_file.parent))
+                    )
 
     def cancel(self) -> None:
         if self.processor:

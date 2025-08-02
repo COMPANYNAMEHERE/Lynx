@@ -24,24 +24,46 @@ class CLIHooks:
     def set_status(self, msg: str) -> None:
         self.logger.info(msg)
 
+    def confirm_overwrite(self, path: str) -> bool:
+        if not sys.stdin.isatty():
+            return True
+        resp = input(f"Overwrite existing file {path}? [y/N] ")
+        return resp.strip().lower().startswith("y")
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Return parsed command-line arguments."""
     p = argparse.ArgumentParser(description="Headless Lynx video upscaler")
     p.add_argument("input", help="input video file or URL")
-    p.add_argument("-o", "--output", default=DEFAULTS["output"], help="output file")
+    p.add_argument(
+        "-o",
+        "--output",
+        default=DEFAULTS["output"],
+        help="output directory or file path",
+    )
     p.add_argument("--width", type=int, default=DEFAULTS["target_width"], help="target width")
     p.add_argument("--height", type=int, default=DEFAULTS["target_height"], help="target height")
     p.add_argument("--tile", type=int, default=DEFAULTS["tile"], help="tile size")
     p.add_argument("--cq", type=int, default=DEFAULTS["cq"], help="NVENC constant quality")
     p.add_argument("--codec", default=DEFAULTS["codec"], help="FFmpeg codec")
     p.add_argument("--preset", default=DEFAULTS["preset"], help="NVENC preset")
-    p.add_argument("--weights-dir", default=DEFAULTS["weights_dir"], help="Real-ESRGAN weights directory")
+    # folder containing model weight files (RealESRGAN, Swin2SR, HAT, AdcSR)
+    p.add_argument("--weights-dir", default=DEFAULTS["weights_dir"], help="model weights directory")
     p.add_argument("--workdir", default=DEFAULTS["workdir"], help="temporary working directory")
     p.add_argument("--fp16", action="store_true", default=DEFAULTS["use_fp16"], help="use fp16 upscaling")
     p.add_argument("--keep-temps", action="store_true", default=DEFAULTS["keep_temps"], help="keep temporary files")
     p.add_argument("--no-prefetch", dest="prefetch_models", action="store_false", default=DEFAULTS["prefetch_models"], help="skip model download")
     p.add_argument("--strict-model-hash", action="store_true", default=DEFAULTS["strict_model_hash"], help="fail on weight checksum mismatch")
+    # map human-friendly quality levels to specific model architectures
+    p.add_argument(
+        "--quality",
+        choices=["quick", "medium", "high", "super"],
+        default=DEFAULTS["model_quality"],
+        help=(
+            "select model quality: quick=RealESRGAN (fastest), "
+            "medium=Swin2SR, high=HAT, super=AdcSR"
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -63,6 +85,7 @@ def main(argv: list[str] | None = None) -> None:
         "keep_temps": args.keep_temps,
         "prefetch_models": args.prefetch_models,
         "strict_model_hash": args.strict_model_hash,
+        "model_quality": args.quality,
     }
     hooks = CLIHooks()
     proc = Processor(hooks)

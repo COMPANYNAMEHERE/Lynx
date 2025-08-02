@@ -22,7 +22,8 @@ OPTIONS_DIR = _default_options_dir()
 OPTIONS_FILE = OPTIONS_DIR / "settings.json"
 
 DEFAULTS: Dict[str, Any] = {
-    "output": str(Path("outputs") / "output.mp4"),
+    # default output directory; actual file name is chosen dynamically
+    "output": str(Path("outputs")),
     "weights_dir": str(Path("weights")),
     "workdir": str(Path("work")),
     "target_width": 3840,
@@ -35,11 +36,18 @@ DEFAULTS: Dict[str, Any] = {
     "keep_temps": False,
     "prefetch_models": True,
     "strict_model_hash": False,
+    # which upscaling model to use: quick=RealESRGAN, medium=Swin2SR,
+    # high=HAT, super=AdcSR
+    "model_quality": "high",
 }
 
 
 def _validate(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate option values, falling back to defaults for invalid ones."""
+    """Validate option values, falling back to defaults for invalid ones.
+
+    The ``model_quality`` option accepts one of ``quick``, ``medium``,
+    ``high`` or ``super``.
+    """
     clean: Dict[str, Any] = {}
     for key, default in DEFAULTS.items():
         if key not in data:
@@ -53,7 +61,11 @@ def _validate(data: Dict[str, Any]) -> Dict[str, Any]:
                 clean[key] = val
         else:
             if isinstance(val, str) and val:
-                clean[key] = val
+                if key == "model_quality":
+                    if val in {"quick", "medium", "high", "super"}:
+                        clean[key] = val
+                else:
+                    clean[key] = val
     return clean
 
 

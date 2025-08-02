@@ -25,6 +25,31 @@ MODEL_SPECS = {
     },
 }
 
+MODEL_SPECS.update(
+    {
+        "realesr-general-x4v3.pth": {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+            "backup_url": "https://resources.trumanwl.com/models/upscale_models/realesr-general-x4v3.pth",
+            "sha256": None,
+        },
+        "Swin2SR_ClassicalSR_X4_64.pth": {
+            "url": "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/Swin2SR_ClassicalSR_X4_64.pth",
+            "backup_url": "https://huggingface.co/caidas/swin2SR-classical-sr-x4-64/resolve/main/pytorch_model.bin",
+            "sha256": None,
+        },
+        "Real_HAT_GAN_SRx4_sharper.pth": {
+            "url": "https://huggingface.co/Acly/hat/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
+            "backup_url": "https://civitai.com/api/download/models/26825",
+            "sha256": None,
+        },
+        "net_params_200.pkl": {
+            "url": "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/weight/net_params_200.pkl",
+            "backup_url": "https://drive.google.com/uc?id=1c9Q4DkE9RM_UvYVDCQv1SSd5N8KuudAw",
+            "sha256": "87fc2d3b2a007ebd568065f77b1a90fe6c10570408a38b7d72b28e6a16946111",
+        },
+    }
+)
+
 
 def _sha256_of_file(path: Path, bufsize: int = 1024 * 1024) -> str:
     h = hashlib.sha256()
@@ -129,13 +154,30 @@ def ensure_model(
             dest.unlink(missing_ok=True)
 
     if not dest.exists():
-        _download_with_progress(
-            spec["url"],
-            dest,
-            expected_sha256=spec.get("sha256"),
-            strict=strict_hash,
-            progress_cb=progress_cb,
-            log_cb=log_cb,
-            cancel_event=cancel_event,
-        )
+        try:
+            _download_with_progress(
+                spec["url"],
+                dest,
+                expected_sha256=spec.get("sha256"),
+                strict=strict_hash,
+                progress_cb=progress_cb,
+                log_cb=log_cb,
+                cancel_event=cancel_event,
+            )
+        except Exception as exc:
+            backup = spec.get("backup_url")
+            if not backup:
+                raise
+            logger.warning("Primary URL failed for %s: %s", model_filename, exc)
+            if log_cb:
+                log_cb("Primary download failed, trying backup…")
+            _download_with_progress(
+                backup,
+                dest,
+                expected_sha256=spec.get("sha256"),
+                strict=strict_hash,
+                progress_cb=progress_cb,
+                log_cb=log_cb,
+                cancel_event=cancel_event,
+            )
     return dest
