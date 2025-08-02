@@ -4,6 +4,8 @@ opencv-python>=4.9
 tqdm>=4.66
 yt-dlp>=2024.7
 realesrgan>=0.3.0
+# Needed for Swin2SR and HAT transformer models
+timm>=0.9
 # Use the upstream BasicSR (avoids torchvision import issues)
 basicsr @ git+https://github.com/XPixelGroup/BasicSR@master
 PyQt5>=5.15
