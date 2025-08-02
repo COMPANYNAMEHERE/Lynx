@@ -47,8 +47,11 @@ class Processor:
         self.cancel_event.set()
 
     # Internal helpers
-    def _log(self, msg: str) -> None:
+    def _log(self, msg: str, *args: object) -> None:
+        if args:
+            msg = msg % args
         logger.info(msg)
+        self.ui.log(msg)
 
     def _set_bar(self, which: str, done: int, total: int) -> None:
         self.ui.set_progress(which, done, total)
@@ -110,6 +113,7 @@ class Processor:
             inp_path = Path(cfg["input"]).expanduser().resolve()
             if not inp_path.exists():
                 raise RuntimeError(f"Input not found: {inp_path}")
+            self._log(f"Using local input {inp_path}")
             if out_file is None:
                 out_file = output_dir / f"{_sanitize(inp_path.stem)}.mp4"
 
@@ -126,6 +130,7 @@ class Processor:
         cap = cv2.VideoCapture(str(inp_path))
         if not cap.isOpened():
             raise RuntimeError("Failed to open input video.")
+        self._log("Video opened successfully")
 
         in_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         in_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -153,6 +158,7 @@ class Processor:
                 "Real_HAT_GAN_SRx4_sharper.pth",
                 "net_params_200.pkl",
             ]:
+                self._log(f"Ensuring model {fname}")
                 ensure_model(
                     weights_dir,
                     fname,
@@ -249,5 +255,7 @@ class Processor:
                 cancel_event=self.cancel_event,
                 log_cb=self._log,
             )
+
+        self._log("Encoding finished")
 
         logger.info("Processing finished")

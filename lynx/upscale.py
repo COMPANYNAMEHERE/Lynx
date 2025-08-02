@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
+import torch
 from .logger import get_logger
 
 logger = get_logger()
@@ -32,6 +33,8 @@ def build_upsampler(
     fallback is used and a warning is logged.
     """
 
+    logger.info("Initialising %s quality upsampler", quality)
+
     if quality == "quick":
         rrdb = RRDBNet(
             num_in_ch=3,
@@ -41,6 +44,7 @@ def build_upsampler(
             num_grow_ch=32,
             scale=base_scale,
         )
+        logger.debug("Using RRDBNet architecture")
         return RealESRGANer(
             scale=base_scale,
             model_path=model_path,
@@ -66,6 +70,7 @@ def build_upsampler(
                 mlp_ratio=2,
                 upsampler="nearest+conv",
             )
+            logger.debug("Loaded Swin2SR model")
         elif quality == "better":
             from hat.models.hat_arch import HAT
 
@@ -81,10 +86,12 @@ def build_upsampler(
                 mlp_ratio=2,
                 upsampler="nearest+conv",
             )
+            logger.debug("Loaded HAT model")
         elif quality == "best":
             from adcsr_inference import AdcSREnhancer
 
             net = AdcSREnhancer(model_path)
+            logger.debug("Loaded AdcSR model")
             # AdcSR already encapsulates loading, return early
             return net
         else:
@@ -94,6 +101,7 @@ def build_upsampler(
         if isinstance(net, torch.nn.Module):
             net.load_state_dict(weights, strict=False)
             net.eval()
+        logger.debug("Loaded weights from %s", model_path)
         return net
     except Exception as exc:  # pragma: no cover - optional deps
         logger.warning("Falling back to RealESRGAN for quality %s: %s", quality, exc)
