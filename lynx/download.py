@@ -22,8 +22,11 @@ def yt_download(
     temp_dir: Path,
     progress_cb: Optional[Callable[[int, int], None]] = None,
     log_cb: Optional[Callable[[str], None]] = None,
-) -> Path:
-    """Download a YouTube video to `downloads_dir` using yt-dlp."""
+) -> tuple[Path, str]:
+    """Download a YouTube video to `downloads_dir` using yt-dlp.
+
+    Returns the downloaded file path and the video title.
+    """
 
     downloads_dir.mkdir(parents=True, exist_ok=True)
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -84,7 +87,7 @@ def yt_download(
             if log_cb:
                 log_cb(f"Downloaded: {final.name}")
             logger.info("Downloaded video: %s", final)
-            return final.resolve()
+            return final.resolve(), info.get("title", final.stem)
     finally:
         if orig_tmp is None:
             os.environ.pop("TMP", None)

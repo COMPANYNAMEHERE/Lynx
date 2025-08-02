@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import re
 import subprocess
 import threading
 from pathlib import Path
@@ -31,6 +32,7 @@ class UIHooks:
     def log(self, msg: str) -> None: ...
     def set_progress(self, which: str, done: int, total: int) -> None: ...
     def set_status(self, msg: str) -> None: ...
+    def confirm_overwrite(self, path: str) -> bool: ...
 
 
 class Processor:
@@ -39,6 +41,7 @@ class Processor:
     def __init__(self, ui: UIHooks) -> None:
         self.ui = ui
         self.cancel_event = threading.Event()
+        self.output_path: Optional[Path] = None
 
     def cancel(self) -> None:
         self.cancel_event.set()
@@ -78,23 +81,47 @@ class Processor:
         workdir = Path(cfg["workdir"])
         downloads_dir = workdir / "downloads"
         temp_dir = workdir / "temp"
-        Path(cfg["output"]).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+
+        out_param = Path(cfg["output"]).expanduser()
+        if out_param.suffix:
+            output_dir = out_param.parent
+            out_file: Optional[Path] = out_param
+        else:
+            output_dir = out_param
+            out_file = None
+        output_dir.mkdir(parents=True, exist_ok=True)
+        self._log(f"Output directory: {output_dir}")
+
+        def _sanitize(name: str) -> str:
+            return re.sub(r"[^\w\-\. ]+", "_", name).strip()
 
         if is_url(cfg["input"]):
-            inp_path = yt_download(
+            inp_path, title = yt_download(
                 cfg["input"],
                 downloads_dir,
                 temp_dir,
                 progress_cb=lambda d, t: self._set_bar("download", d, t or 1),
                 log_cb=self._log,
             )
+            self._log(f"Downloaded source to {inp_path}")
+            if out_file is None:
+                out_file = output_dir / f"{_sanitize(title)}.mp4"
         else:
             inp_path = Path(cfg["input"]).expanduser().resolve()
             if not inp_path.exists():
                 raise RuntimeError(f"Input not found: {inp_path}")
+            if out_file is None:
+                out_file = output_dir / f"{_sanitize(inp_path.stem)}.mp4"
 
-        out_path = Path(cfg["output"]).expanduser().resolve()
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        assert out_file is not None
+        if out_file.exists():
+            if not self.ui.confirm_overwrite(str(out_file)):
+                self._log("Output file exists and overwrite not confirmed")
+                return
+
+        self._log(f"Output will be written to {out_file}")
+
+        self.output_path = out_file.resolve()
 
         cap = cv2.VideoCapture(str(inp_path))
         if not cap.isOpened():
@@ -136,6 +163,7 @@ class Processor:
 
         def frames_iter():
             fidx = 0
+            self._log("Decoding frames…")
             while True:
                 if self.cancel_event.is_set():
                     break
@@ -152,12 +180,13 @@ class Processor:
 
         if passthrough:
             self._log("Target ≈ source size → pass-through encode (no upscaling).")
+            self._log("Encoding using %s to %s", cfg["codec"], self.output_path)
             run_ffmpeg_encode(
                 frames_iter(),
                 out_w,
                 out_h,
                 fps,
-                out_path,
+                self.output_path,
                 cfg["codec"],
                 cfg["preset"],
                 cfg["cq"],
@@ -175,6 +204,7 @@ class Processor:
                 progress_cb=lambda d, t: self._set_bar("download", d, t or 1),
                 log_cb=self._log,
             )
+            self._log(f"Using model {model_file}")
             device = "cuda" if torch.cuda.is_available() else "cpu"
             up = build_upsampler(
                 str(model_path),
@@ -185,6 +215,7 @@ class Processor:
             )
             if device != "cuda":
                 self._log("⚠ Running on CPU; this will be slow.")
+            self._log("Encoding using %s to %s", cfg["codec"], self.output_path)
 
             def upscaled_frames():
                 fidx = 0
@@ -211,7 +242,7 @@ class Processor:
                 out_w,
                 out_h,
                 fps,
-                out_path,
+                self.output_path,
                 cfg["codec"],
                 cfg["preset"],
                 cfg["cq"],

@@ -78,8 +78,9 @@ class TestHelpers(unittest.TestCase):
                 return str(dld / 'file')
 
         with mock.patch('yt_dlp.YoutubeDL', Dummy):
-            path = dl.yt_download('https://x', dld, tmp)
+            path, title = dl.yt_download('https://x', dld, tmp)
             self.assertTrue(path.exists())
+            self.assertEqual(title, 'file')
 
         self.assertEqual(os.environ.get('TMP'), orig_tmp)
         self.assertEqual(os.environ.get('TEMP'), orig_temp)

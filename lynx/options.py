@@ -22,7 +22,8 @@ OPTIONS_DIR = _default_options_dir()
 OPTIONS_FILE = OPTIONS_DIR / "settings.json"
 
 DEFAULTS: Dict[str, Any] = {
-    "output": str(Path("outputs") / "output.mp4"),
+    # default output directory; actual file name is chosen dynamically
+    "output": str(Path("outputs")),
     "weights_dir": str(Path("weights")),
     "workdir": str(Path("work")),
     "target_width": 3840,
