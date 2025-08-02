@@ -54,6 +54,7 @@ class ProcessorThread(QtCore.QThread):
             self.proc.run(self.cfg)
         except Exception as e:
             self.error = e
+            logger.exception("Processing error")
 
 
 class OptionsDialog(QtWidgets.QDialog):
@@ -450,8 +451,15 @@ class MainWindow(QtWidgets.QMainWindow):
         logger.debug("Processing thread launched")
 
     def processing_finished(self) -> None:  # pragma: no cover - UI
+        error = None
+        out_file: Optional[Path] = None
         if self.thread:
             self.thread.wait()
+            error = self.thread.error
+        if self.processor:
+            path = getattr(self.processor, "output_path", None)
+            if path:
+                out_file = Path(path)
         self.thread = None
         self.processor = None
         self.bar_dl.setRange(0, 100)
@@ -460,12 +468,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bar_proc.setValue(0)
         self.btn_start.setEnabled(True)
         self.btn_cancel.setEnabled(False)
-        if self.status_label.text().startswith("Cancelling"):
+        if error:
+            QtWidgets.QMessageBox.critical(self, "Error", str(error))
+            logger.error("Processing failed: %s", error)
+            self.set_status("Error")
+        elif self.status_label.text().startswith("Cancelling"):
             self.set_status("Cancelled")
         else:
             self.set_status("Finished")
-            if self.processor and getattr(self.processor, "output_path", None):
-                out_file = Path(self.processor.output_path)
+            if out_file:
                 ans = QtWidgets.QMessageBox.question(
                     self,
                     "Open folder",
