@@ -201,7 +201,7 @@ class Processor:
             )
         else:
             model_file, base_scale = pick_model_by_quality(
-                cfg.get("model_quality", "normal")
+                cfg.get("model_quality", "high")
             )
             model_path = ensure_model(
                 weights_dir,
@@ -217,7 +217,7 @@ class Processor:
                 base_scale,
                 cfg["tile"],
                 fp16=(device == "cuda" and cfg.get("use_fp16", False)),
-                quality=cfg.get("model_quality", "normal"),
+                quality=cfg.get("model_quality", "high"),
             )
             if device != "cuda":
                 self._log("⚠ Running on CPU; this will be slow.")

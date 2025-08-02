@@ -13,11 +13,11 @@ def pick_model_by_quality(quality: str) -> tuple[str, int]:
     """Return ``(model filename, base scale)`` for the selected quality."""
     if quality == "quick":
         return "realesr-general-x4v3.pth", 4
-    if quality == "normal":
+    if quality == "medium":
         return "Swin2SR_ClassicalSR_X4_64.pth", 4
-    if quality == "better":
+    if quality == "high":
         return "Real_HAT_GAN_SRx4_sharper.pth", 4
-    if quality == "best":
+    if quality == "super":
         return "net_params_200.pkl", 4
     return "RealESRGAN_x4plus.pth", 4
 
@@ -56,7 +56,7 @@ def build_upsampler(
         )
 
     try:
-        if quality == "normal":
+        if quality == "medium":
             from swin2sr.models.network_swin2sr import Swin2SR
 
             net = Swin2SR(
@@ -71,7 +71,7 @@ def build_upsampler(
                 upsampler="nearest+conv",
             )
             logger.debug("Loaded Swin2SR model")
-        elif quality == "better":
+        elif quality == "high":
             from hat.models.hat_arch import HAT
 
             net = HAT(
@@ -87,7 +87,7 @@ def build_upsampler(
                 upsampler="nearest+conv",
             )
             logger.debug("Loaded HAT model")
-        elif quality == "best":
+        elif quality == "super":
             from adcsr_inference import AdcSREnhancer
 
             net = AdcSREnhancer(model_path)

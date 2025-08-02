@@ -16,7 +16,7 @@ class TestHelpers(unittest.TestCase):
         if pick_model_by_quality is None:
             self.skipTest('RealESRGAN dependencies missing')
         self.assertEqual(pick_model_by_quality('quick'), ('realesr-general-x4v3.pth', 4))
-        self.assertEqual(pick_model_by_quality('normal'), ('Swin2SR_ClassicalSR_X4_64.pth', 4))
+        self.assertEqual(pick_model_by_quality('medium'), ('Swin2SR_ClassicalSR_X4_64.pth', 4))
 
     def test_sha256_of_file(self):
         tmp = Path('tests/tmp.txt')
@@ -91,11 +91,11 @@ class TestHelpers(unittest.TestCase):
     def test_cli_parse_args(self):
         from lynx.cli import parse_args
 
-        args = parse_args(["in.mp4", "-o", "out.mp4", "--width", "1280", "--quality", "better"])
+        args = parse_args(["in.mp4", "-o", "out.mp4", "--width", "1280", "--quality", "high"])
         self.assertEqual(args.input, "in.mp4")
         self.assertEqual(args.output, "out.mp4")
         self.assertEqual(args.width, 1280)
-        self.assertEqual(args.quality, "better")
+        self.assertEqual(args.quality, "high")
 
 if __name__ == '__main__':
     unittest.main()

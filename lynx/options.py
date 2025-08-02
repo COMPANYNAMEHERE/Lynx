@@ -36,17 +36,17 @@ DEFAULTS: Dict[str, Any] = {
     "keep_temps": False,
     "prefetch_models": True,
     "strict_model_hash": False,
-    # which upscaling model to use: quick=RealESRGAN, normal=Swin2SR,
-    # better=HAT, best=AdcSR
-    "model_quality": "normal",
+    # which upscaling model to use: quick=RealESRGAN, medium=Swin2SR,
+    # high=HAT, super=AdcSR
+    "model_quality": "high",
 }
 
 
 def _validate(data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate option values, falling back to defaults for invalid ones.
 
-    The ``model_quality`` option accepts one of ``quick``, ``normal``,
-    ``better`` or ``best``.
+    The ``model_quality`` option accepts one of ``quick``, ``medium``,
+    ``high`` or ``super``.
     """
     clean: Dict[str, Any] = {}
     for key, default in DEFAULTS.items():
@@ -62,7 +62,7 @@ def _validate(data: Dict[str, Any]) -> Dict[str, Any]:
         else:
             if isinstance(val, str) and val:
                 if key == "model_quality":
-                    if val in {"quick", "normal", "better", "best"}:
+                    if val in {"quick", "medium", "high", "super"}:
                         clean[key] = val
                 else:
                     clean[key] = val

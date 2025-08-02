@@ -328,14 +328,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_quality.setText(quality.title())
         # show mapping between friendly names and actual model architectures
         self.btn_quality.setToolTip(
-            "quick=RealESRGAN, normal=Swin2SR, better=HAT, best=AdcSR"
+            "quick=RealESRGAN, medium=Swin2SR, high=HAT, super=AdcSR"
         )
         menu = QtWidgets.QMenu(self.btn_quality)
         items = [
             ("quick", "Quick – RealESRGAN"),
-            ("normal", "Normal – Swin2SR"),
-            ("better", "Better – HAT"),
-            ("best", "Best – AdcSR"),
+            ("medium", "Medium – Swin2SR"),
+            ("high", "High – HAT"),
+            ("super", "Super – AdcSR"),
         ]
         for name, label in items:
             act = menu.addAction(label)

@@ -57,11 +57,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     # map human-friendly quality levels to specific model architectures
     p.add_argument(
         "--quality",
-        choices=["quick", "normal", "better", "best"],
+        choices=["quick", "medium", "high", "super"],
         default=DEFAULTS["model_quality"],
         help=(
             "select model quality: quick=RealESRGAN (fastest), "
-            "normal=Swin2SR, better=HAT, best=AdcSR"
+            "medium=Swin2SR, high=HAT, super=AdcSR"
         ),
     )
     return p.parse_args(argv)
