@@ -23,27 +23,32 @@ MODEL_SPECS = {
         "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
         "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
     },
-    "realesr-general-x4v3.pth": {
-        "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
-        "backup_url": "https://resources.trumanwl.com/models/upscale_models/realesr-general-x4v3.pth",
-        "sha256": None,
-    },
-    "Swin2SR_ClassicalSR_X4_64.pth": {
-        "url": "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/Swin2SR_ClassicalSR_X4_64.pth",
-        "backup_url": "https://huggingface.co/caidas/swin2SR-classical-sr-x4-64/resolve/main/pytorch_model.bin",
-        "sha256": None,
-    },
-    "Real_HAT_GAN_SRx4_sharper.pth": {
-        "url": "https://huggingface.co/Acly/hat/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
-        "backup_url": "https://civitai.com/api/download/models/26825",
-        "sha256": None,
-    },
-    "net_params_200.pkl": {
-        "url": "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/net_params_200.pkl",
-        "backup_url": "https://drive.google.com/uc?id=1c9Q4DkE9RM_UvYVDCQv1SSd5N8KuudAw",
-        "sha256": None,
-    },
 }
+
+MODEL_SPECS.update(
+    {
+        "realesr-general-x4v3.pth": {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+            "backup_url": "https://resources.trumanwl.com/models/upscale_models/realesr-general-x4v3.pth",
+            "sha256": None,
+        },
+        "Swin2SR_ClassicalSR_X4_64.pth": {
+            "url": "https://github.com/mv-lab/swin2sr/releases/download/v0.0.1/Swin2SR_ClassicalSR_X4_64.pth",
+            "backup_url": "https://huggingface.co/caidas/swin2SR-classical-sr-x4-64/resolve/main/pytorch_model.bin",
+            "sha256": None,
+        },
+        "Real_HAT_GAN_SRx4_sharper.pth": {
+            "url": "https://huggingface.co/Acly/hat/resolve/main/Real_HAT_GAN_SRx4_sharper.pth",
+            "backup_url": "https://civitai.com/api/download/models/26825",
+            "sha256": None,
+        },
+        "net_params_200.pkl": {
+            "url": "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/net_params_200.pkl",
+            "backup_url": "https://drive.google.com/uc?id=1c9Q4DkE9RM_UvYVDCQv1SSd5N8KuudAw",
+            "sha256": None,
+        },
+    }
+)
 
 
 def _sha256_of_file(path: Path, bufsize: int = 1024 * 1024) -> str:
