@@ -75,6 +75,22 @@ def yt_download(
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
+            # Fetch metadata first so we can determine the final filename and
+            # handle any pre-existing file that might be locked by another
+            # process.
+            info = ydl.extract_info(url, download=False)
+            base = ydl.prepare_filename(info)
+            final = Path(base).with_suffix(".mkv")
+            if final.exists():
+                try:
+                    final.unlink()
+                    logger.info("Removed existing download: %s", final)
+                except PermissionError as exc:
+                    if log_cb:
+                        log_cb("Existing file in use; aborting download.")
+                    raise RuntimeError("Destination file is locked") from exc
+
+            # Now perform the actual download
             info = ydl.extract_info(url, download=True)
             base = ydl.prepare_filename(info)
             final = Path(base).with_suffix(".mkv")

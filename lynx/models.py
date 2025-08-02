@@ -43,9 +43,9 @@ MODEL_SPECS.update(
             "sha256": None,
         },
         "net_params_200.pkl": {
-            "url": "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/net_params_200.pkl",
+            "url": "https://huggingface.co/Guaishou74851/AdcSR/resolve/main/weight/net_params_200.pkl",
             "backup_url": "https://drive.google.com/uc?id=1c9Q4DkE9RM_UvYVDCQv1SSd5N8KuudAw",
-            "sha256": None,
+            "sha256": "87fc2d3b2a007ebd568065f77b1a90fe6c10570408a38b7d72b28e6a16946111",
         },
     }
 )

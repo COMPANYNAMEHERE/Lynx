@@ -67,12 +67,12 @@ class TestHelpers(unittest.TestCase):
             def __init__(self, opts):
                 self.opts = opts
             def __enter__(self):
-                self.f = dld / 'file.mkv'
-                self.f.write_text('x')
                 return self
             def __exit__(self, *a):
                 pass
             def extract_info(self, url, download=True):
+                if download:
+                    (dld / 'file.mkv').write_text('x')
                 return {'title': 'file', 'id': 'id', 'ext': 'mkv'}
             def prepare_filename(self, info):
                 return str(dld / 'file')
