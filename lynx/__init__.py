@@ -15,6 +15,7 @@ __all__ = [
     "upscale",
     "encode",
     "processor",
+    "preloader",
     "gui",
     "cli",
 ]

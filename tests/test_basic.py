@@ -90,10 +90,46 @@ class TestHelpers(unittest.TestCase):
     def test_cli_parse_args(self):
         from lynx.cli import parse_args
 
-        args = parse_args(["in.mp4", "-o", "out.mp4", "--width", "1280"])
-        self.assertEqual(args.input, "in.mp4")
+        args = parse_args([
+            "https://example.com/watch?v=1",
+            "-o",
+            "out.mp4",
+            "--width",
+            "1280",
+            "--no-fp16",
+            "--no-prefetch-models",
+        ])
+        self.assertEqual(args.url, "https://example.com/watch?v=1")
         self.assertEqual(args.output, "out.mp4")
         self.assertEqual(args.width, 1280)
+        self.assertFalse(args.fp16)
+        self.assertFalse(args.prefetch_models)
+
+    def test_preload_config_to_processor(self):
+        from lynx.preloader import PreloadConfig
+
+        cfg = PreloadConfig(
+            url="https://example.com/watch?v=test",
+            output_path=Path("outputs/custom.mp4"),
+            target_width=1920,
+            target_height=1080,
+            workdir=Path("work/custom"),
+            weights_dir=Path("weights/custom"),
+            tile=128,
+            cq=15,
+            codec="h264_nvenc",
+            preset="p4",
+            use_fp16=False,
+            keep_temps=True,
+            prefetch_models=False,
+            strict_model_hash=True,
+        )
+        proc_cfg = cfg.to_processor_config()
+        self.assertEqual(proc_cfg["input"], cfg.url)
+        self.assertEqual(proc_cfg["output"], str(cfg.output_path))
+        self.assertEqual(proc_cfg["workdir"], str(Path("work/custom").expanduser().resolve()))
+        self.assertFalse(proc_cfg["prefetch_models"])
+        self.assertTrue(proc_cfg["keep_temps"])
 
 if __name__ == '__main__':
     unittest.main()
