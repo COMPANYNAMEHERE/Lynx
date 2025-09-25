@@ -4,73 +4,112 @@ import argparse
 import sys
 
 from .options import DEFAULTS
-from .logger import get_logger
-
-
-class CLIHooks:
-    """Console-based hooks for :class:`Processor`."""
-
-    def __init__(self) -> None:
-        self.logger = get_logger()
-
-    def log(self, msg: str) -> None:
-        self.logger.info(msg)
-
-    def set_progress(self, which: str, done: int, total: int) -> None:
-        if total > 0:
-            pct = int(done / total * 100)
-            self.logger.info("%s %d%% (%d/%d)", which, pct, done, total)
-
-    def set_status(self, msg: str) -> None:
-        self.logger.info(msg)
+from .preloader import ConsolePreloadHooks, PreloadConfig, VideoPreloader
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Return parsed command-line arguments."""
-    p = argparse.ArgumentParser(description="Headless Lynx video upscaler")
-    p.add_argument("input", help="input video file or URL")
-    p.add_argument("-o", "--output", default=DEFAULTS["output"], help="output file")
-    p.add_argument("--width", type=int, default=DEFAULTS["target_width"], help="target width")
-    p.add_argument("--height", type=int, default=DEFAULTS["target_height"], help="target height")
-    p.add_argument("--tile", type=int, default=DEFAULTS["tile"], help="tile size")
-    p.add_argument("--cq", type=int, default=DEFAULTS["cq"], help="NVENC constant quality")
-    p.add_argument("--codec", default=DEFAULTS["codec"], help="FFmpeg codec")
-    p.add_argument("--preset", default=DEFAULTS["preset"], help="NVENC preset")
-    p.add_argument("--weights-dir", default=DEFAULTS["weights_dir"], help="Real-ESRGAN weights directory")
-    p.add_argument("--workdir", default=DEFAULTS["workdir"], help="temporary working directory")
-    p.add_argument("--fp16", action="store_true", default=DEFAULTS["use_fp16"], help="use fp16 upscaling")
-    p.add_argument("--keep-temps", action="store_true", default=DEFAULTS["keep_temps"], help="keep temporary files")
-    p.add_argument("--no-prefetch", dest="prefetch_models", action="store_false", default=DEFAULTS["prefetch_models"], help="skip model download")
-    p.add_argument("--strict-model-hash", action="store_true", default=DEFAULTS["strict_model_hash"], help="fail on weight checksum mismatch")
+    """Return parsed command-line arguments for the preloader CLI."""
+
+    p = argparse.ArgumentParser(
+        description="Download a YouTube video ahead of time and upscale it locally.",
+    )
+    p.add_argument(
+        "url",
+        help="YouTube video URL or path to a pre-downloaded video",
+    )
+    p.add_argument(
+        "-o",
+        "--output",
+        default=DEFAULTS["output"],
+        help="Destination file for the upscaled video",
+    )
+    p.add_argument(
+        "--width",
+        type=int,
+        default=DEFAULTS["target_width"],
+        help="Target width for the upscaled output",
+    )
+    p.add_argument(
+        "--height",
+        type=int,
+        default=DEFAULTS["target_height"],
+        help="Target height for the upscaled output",
+    )
+    p.add_argument(
+        "--tile",
+        type=int,
+        default=DEFAULTS["tile"],
+        help="Tile size for Real-ESRGAN inference",
+    )
+    p.add_argument(
+        "--cq",
+        type=int,
+        default=DEFAULTS["cq"],
+        help="NVENC constant quality setting",
+    )
+    p.add_argument(
+        "--codec",
+        default=DEFAULTS["codec"],
+        help="FFmpeg video codec to use",
+    )
+    p.add_argument(
+        "--preset",
+        default=DEFAULTS["preset"],
+        help="NVENC preset to use",
+    )
+    p.add_argument(
+        "--weights-dir",
+        default=DEFAULTS["weights_dir"],
+        help="Directory where Real-ESRGAN model weights are stored",
+    )
+    p.add_argument(
+        "--workdir",
+        default=DEFAULTS["workdir"],
+        help="Working directory for downloads and temporary data",
+    )
+    p.add_argument(
+        "--fp16",
+        action=argparse.BooleanOptionalAction,
+        default=DEFAULTS["use_fp16"],
+        help="Toggle fp16 inference when CUDA is available",
+    )
+    p.add_argument(
+        "--keep-temps",
+        action="store_true",
+        default=DEFAULTS["keep_temps"],
+        help="Keep intermediate temporary files",
+    )
+    p.add_argument(
+        "--prefetch-models",
+        action=argparse.BooleanOptionalAction,
+        default=DEFAULTS["prefetch_models"],
+        help="Pre-download Real-ESRGAN weights before processing",
+    )
+    p.add_argument(
+        "--strict-model-hash",
+        action="store_true",
+        default=DEFAULTS["strict_model_hash"],
+        help="Abort when a weight checksum mismatch is detected",
+    )
     return p.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
-    from .processor import Processor
-    cfg = {
-        "input": args.input,
-        "output": args.output,
-        "target_width": args.width,
-        "target_height": args.height,
-        "tile": args.tile,
-        "cq": args.cq,
-        "codec": args.codec,
-        "preset": args.preset,
-        "weights_dir": args.weights_dir,
-        "workdir": args.workdir,
-        "use_fp16": args.fp16,
-        "keep_temps": args.keep_temps,
-        "prefetch_models": args.prefetch_models,
-        "strict_model_hash": args.strict_model_hash,
-    }
-    hooks = CLIHooks()
-    proc = Processor(hooks)
+    hooks = ConsolePreloadHooks()
+    config = PreloadConfig.from_args(args)
+    preloader = VideoPreloader(config, hooks=hooks)
+
     try:
-        proc.run(cfg)
+        result = preloader.prepare()
     except Exception as exc:  # pragma: no cover - runtime errors
         hooks.log(f"Error: {exc}")
         sys.exit(1)
+
+    w, h = result.output_resolution
+    hooks.log(
+        f"Finished preloading {result.output_path} ({w}x{h}) in {result.elapsed_seconds:.2f} s",
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover - manual invocation

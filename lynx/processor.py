@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import math
+import shutil
 import subprocess
 import threading
+from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Optional
 
 try:
@@ -23,6 +26,18 @@ from .upscale import build_upsampler, pick_model
 from .logger import get_logger
 
 logger = get_logger()
+
+
+@dataclass
+class ProcessingResult:
+    """Summary returned by :meth:`Processor.run`."""
+
+    source_path: Path
+    output_path: Path
+    output_resolution: tuple[int, int]
+    fps: float
+    processed_frames: Optional[int]
+    elapsed_seconds: float
 
 
 class UIHooks:
@@ -50,9 +65,10 @@ class Processor:
     def _set_bar(self, which: str, done: int, total: int) -> None:
         self.ui.set_progress(which, done, total)
 
-    def run(self, cfg: dict) -> None:
+    def run(self, cfg: dict) -> ProcessingResult:
         """Entry point for the processing thread."""
         logger.info("Processing thread started")
+        start_time = perf_counter()
         if cv2 is None:
             raise RuntimeError(
                 f"OpenCV is unavailable: {CV2_IMPORT_ERROR}. Please install opencv-python"
@@ -135,7 +151,10 @@ class Processor:
                 log_cb=self._log,
             )
 
+        processed_frames: Optional[int] = None
+
         def frames_iter():
+            nonlocal processed_frames
             fidx = 0
             while True:
                 if self.cancel_event.is_set():
@@ -148,6 +167,7 @@ class Processor:
                 if nframes:
                     self._set_bar("process", fidx, nframes)
                 self.ui.set_status(f"Reading… {fidx}/{nframes or '?'}")
+                processed_frames = fidx
                 yield rgb
             cap.release()
 
@@ -185,6 +205,7 @@ class Processor:
                 self._log("⚠ Running on CPU; this will be slow.")
 
             def upscaled_frames():
+                nonlocal processed_frames
                 fidx = 0
                 self._log("Upscaling…")
                 while True:
@@ -201,6 +222,7 @@ class Processor:
                     if nframes:
                         self._set_bar("process", fidx, nframes)
                     self.ui.set_status(f"SR… {fidx}/{nframes or '?'}")
+                    processed_frames = fidx
                     yield sr
                 cap.release()
 
@@ -217,4 +239,25 @@ class Processor:
                 log_cb=self._log,
             )
 
+        if processed_frames is None and nframes:
+            processed_frames = nframes
+
+        elapsed = perf_counter() - start_time
+
+        if not cfg.get("keep_temps"):
+            try:
+                if temp_dir.exists():
+                    shutil.rmtree(temp_dir)
+                    self._log(f"Cleaned temporary files under {temp_dir}")
+            except Exception as exc:  # pragma: no cover - best effort cleanup
+                self._log(f"⚠ Failed to clean temporary files: {exc}")
+
         logger.info("Processing finished")
+        return ProcessingResult(
+            source_path=inp_path,
+            output_path=out_path,
+            output_resolution=(out_w, out_h),
+            fps=fps,
+            processed_frames=processed_frames,
+            elapsed_seconds=elapsed,
+        )

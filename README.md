@@ -1,9 +1,10 @@
 # Lynx
 
-Local YouTube upscaling toolkit using Real‑ESRGAN and NVENC.  The
-application ships with a PyQt5 interface that stores its settings under your
-OS configuration directory, e.g. `~/.config/lynx/settings.json` or
-`%LOCALAPPDATA%\Lynx\settings.json`.
+Lynx now focuses on preloading YouTube videos for smooth offline playback.
+Given a URL the tool downloads the entire stream to disk and immediately
+upscales it with Real‑ESRGAN before handing the result to FFmpeg for fast
+NVENC encoding.  The legacy GUI is still available, but the recommended entry
+point is the new preloader CLI.
 
 ## Quick start
 
@@ -14,17 +15,14 @@ OS configuration directory, e.g. `~/.config/lynx/settings.json` or
    bash setup.sh
    ```
    The log of all actions is saved to `setup/setup.log` for troubleshooting (git ignores this file by default).
-3. Activate the environment and start the GUI:
+3. Activate the environment and run the preloader CLI:
    ```bash
    conda activate lynx
-   python main.py
+   python -m lynx.cli "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
    ```
-   The window shows a status box indicating whether CUDA and the required weights are detected. If you see "GPU detected but PyTorch CPU-only" follow the reinstall notes below.
-4. For headless use, run the CLI:
-   ```bash
-   python -m lynx.cli -h
-   ```
-   The CLI accepts the same options as the GUI.
+   The command downloads the video, upscales it according to your chosen
+   dimensions and writes the result to the `outputs/` directory.  Use
+   `python -m lynx.cli -h` to see all available options.
 
 ## Directory layout
 
